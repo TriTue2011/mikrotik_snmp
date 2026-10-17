@@ -55,6 +55,20 @@ SNMP không có tên máy và không có bộ đếm theo từng máy. Hai thứ
 
 - **WireGuard**: danh sách peer (tên, ghi chú, giao diện, địa chỉ cho phép), tốc độ nhận/gửi (Mbit/s, tính từ byte), lần bắt tay gần nhất và trạng thái kết nối (bắt tay trong 3 phút).
   Mã thực thể theo quy ước card (`sensor.<tiền_tố>_wireguard_<peer>_rx|tx|last_handshake`, `binary_sensor…_connected`); giao diện có peer được đánh dấu `wg` theo dữ liệu.
+- **Cổng thuộc bridge nào**: `/interface/bridge/port/print` (chỉ đọc, cùng nhịp với tên máy). Không có API hoặc lệnh bị từ chối thì cổng nằm trực tiếp dưới router.
+
+## Cây thiết bị trong Home Assistant
+Mỗi thiết bị có thiết bị cha (`via_device`), nên mở trang một thiết bị là thấy mục **Thiết bị được kết nối** liệt kê các thiết bị bên trong, không cần tên mang tiền tố:
+
+```
+MikroTik ─┬─ bridge (ví dụ BridgeLAN) ── ether2 ── ZTE E2633 ── máy WiFi
+          │                            └─ ether3 ── máy có dây
+          └─ giao diện WireGuard ── peer
+```
+- Cổng thuộc bridge nào lấy từ API (mục trên). Cổng ngoài bridge (ví dụ cổng WAN) và bridge nằm trực tiếp dưới router.
+- Máy WiFi chỉ nằm dưới ZTE khi đã điền bước ZTE và ZTE đăng nhập được; nếu không máy đó nằm dưới cổng mà nó được học.
+- Peer WireGuard nằm dưới giao diện WireGuard của nó (nếu giao diện đó có trong SNMP), không thì dưới router.
+- Sau khi đổi cấu hình bridge trên router, vào ⚙ Tuỳ chọn bấm Gửi (tải lại tích hợp) để cây cập nhật ngay; không thì cập nhật ở lần đọc tên kế tiếp.
 
 Bảo mật: tài khoản **chỉ `api,read`** giới hạn theo IP Home Assistant:
 ```
@@ -69,7 +83,7 @@ Máy khách chỉ gửi lệnh `…/print` (mọi lệnh khác bị từ chối 
 2. Cài đặt → Thiết bị & dịch vụ → Thêm tích hợp → **Mạng LAN: MikroTik (SNMP) + ZTE E2633**: nhập IP router, người dùng (`hass`), hai mật khẩu;
    (tuỳ chọn) IP và tài khoản ZTE; rồi chọn cổng.
 3. Nút bánh răng, bước 1: đổi chu kỳ đọc (mặc định 5 giây), cổng hiển thị, và **Tên thiết bị** (mỗi dòng `MAC = Tên`; SNMP không có tên máy nên anh tự đặt,
-   hoặc lấy tên từ ZTE cho máy WiFi). Bước 2 của bánh răng là **ZTE**: thêm, đổi hoặc tắt ZTE sau khi đã cài (để trống mật khẩu = giữ mật khẩu cũ; để trống IP = tắt). Tên thiết bị hiển thị dạng `ether3 · Máy in` nên danh sách thiết bị của Home Assistant xếp các máy cùng cổng liền nhau.
+   hoặc lấy tên từ ZTE cho máy WiFi). Bước 2 của bánh răng là **ZTE**: thêm, đổi hoặc tắt ZTE sau khi đã cài (để trống mật khẩu = giữ mật khẩu cũ; để trống IP = tắt). Tên thiết bị chỉ là tên máy (ví dụ `Máy in`); vị trí nằm ở thiết bị cha, xem mục «Cây thiết bị» bên dưới.
 
 Cần thư viện `pysnmp`: Home Assistant đã có nếu từng dùng tích hợp «SNMP». Nếu thiếu, thêm một cảm biến SNMP bất kỳ một lần để Home Assistant cài nó.
 

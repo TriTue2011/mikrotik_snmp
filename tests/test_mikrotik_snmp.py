@@ -348,6 +348,21 @@ class CauTrucGopTest(unittest.TestCase):
         self.assertIn('self._attr_name = "RX" if huong == "rx" else "TX"', sensor)
         self.assertIn('name=f"WireGuard {p.get(\'comment\') or ten}"', sensor)
 
+    def test_ten_may_khong_con_tien_to_cha(self):
+        """Cây thiết bị (via_device) thay cho tiền tố «cổng · » trong tên: tên máy chỉ còn tên/IP/MAC."""
+        nguon = self._nguon("thiet_bi.py")
+        self.assertNotIn(" · ", nguon[nguon.index("def ten_thiet_bi"):])
+        for ten in ("sensor.py", "device_tracker.py"):
+            self.assertNotIn("ten_thiet_bi(may, coordinator.data", self._nguon(ten))
+
+    def test_cong_va_peer_wireguard_gan_dung_cha(self):
+        thiet_bi, sensor, khoi_dau = self._nguon("thiet_bi.py"), self._nguon("sensor.py"), self._nguon("__init__.py")
+        self.assertIn("def cha_cua_giao_dien", thiet_bi)
+        self.assertIn("cha_cua_giao_dien", sensor)
+        self.assertIn("cha_cua_giao_dien", khoi_dau)
+        self.assertNotIn("via_device=(DOMAIN, entry.entry_id))\n\n\nasync def async_setup_entry", sensor)   # thiet_bi_giao_dien không còn cố định cha là router
+        self.assertIn('dinh_danh_cha(entry.entry_id, p.get("interface"), coordinator.data)', sensor)
+
     def test_zte_la_tuy_chon(self):
         self.assertIn("co_zte", self._nguon("__init__.py"))
         self.assertIn("if coordinator.co_zte:", self._nguon("sensor.py"))
@@ -390,6 +405,7 @@ class ApiGia:
         ra = {}
         if lay_ten:
             ra["ten"] = {"AA:BB:CC:DD:EE:01": {"comment": "Máy in", "host_name": "hp"}}
+            ra["bridge"] = getattr(self, "bridge", {"ether2": "BridgeLAN"})
         if lay_kid:
             ra["kid"] = self.kid
         if lay_wg:
@@ -446,6 +462,26 @@ class GopApiTest(unittest.TestCase):
 
     def test_khong_khai_api_thi_api_none(self):
         self.assertIsNone(chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())["api"])
+
+
+class BridgeThuThapTest(unittest.TestCase):
+    def test_cong_trong_bridge_vao_cay_va_giu_khi_lan_sau_loi(self):
+        r, a, dh = RouterGia(), ApiGia(), DongHo()
+        tt = ThuThap(r, None, dh, api=a)
+        d = chay(tt.cap_nhat())
+        nut = {n["id"]: n for n in d["tree"]["nodes"]}
+        self.assertEqual(nut["ether2"]["parent"], "BridgeLAN")
+        self.assertEqual(nut["BridgeLAN"]["parent"], "router")
+        self.assertEqual(d["bridge"], {"ether2": "BridgeLAN"})
+        a.loi = RuntimeError("mất mạng")
+        dh.t += 5
+        d = chay(tt.cap_nhat())
+        self.assertEqual({n["id"]: n for n in d["tree"]["nodes"]}["ether2"]["parent"], "BridgeLAN")   # lỗi: giữ kết quả cũ
+
+    def test_khong_api_thi_cong_ve_router(self):
+        d = chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())
+        self.assertEqual({n["id"]: n for n in d["tree"]["nodes"]}["ether2"]["parent"], "router")
+        self.assertEqual(d["bridge"], {})
 
 
 class WireGuardThuThapTest(unittest.TestCase):

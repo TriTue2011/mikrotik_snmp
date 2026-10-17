@@ -58,6 +58,7 @@ class ThuThap:
         self._truoc_kid: dict[str, tuple[float, int]] = {}
         self._truoc_wg: dict[str, tuple[float, int]] = {}
         self._wg: list[dict[str, Any]] = []
+        self._bridge: dict[str, str] = {}
         self._trang_thai_api = "chua_doc" if api else None
         self._lan_zte = -1e18
         self._du_lieu_zte: dict[str, Any] | None = (
@@ -179,6 +180,8 @@ class ThuThap:
         if lay_ten and d.get("ten") is not None:
             self._ten_mik = d["ten"]
             self._lan_ten_mik = t
+        if d.get("bridge") is not None:
+            self._bridge = d["bridge"]
         if d.get("wg") is not None:
             self._wg = L.toc_do_wg(self._truoc_wg, d["wg"], t)
         kid = d.get("kid")
@@ -227,8 +230,8 @@ class ThuThap:
             ra[i] = g
         ten_router = self._loi_he_thong.get("name") or "MikroTik"
         cay = xay_cay(ra, self._thiet_bi["bang_mac"], self._thiet_bi["arp"], self._du_lieu_zte, ten_router, self._ten_may,
-                     self._ten_mik, self._toc_do)
+                     self._ten_mik, self._toc_do, self._bridge)
         return {"interfaces": ra, "core": dict(self._loi_he_thong), "devices": dict(self._thiet_bi), "tree": cay,
                 "zte": dict(self._du_lieu_zte) if self._du_lieu_zte else None,
                 "api": {"trang_thai": self._trang_thai_api} if self._api is not None else None,
-                "wireguard": list(self._wg)}
+                "wireguard": list(self._wg), "bridge": dict(self._bridge)}

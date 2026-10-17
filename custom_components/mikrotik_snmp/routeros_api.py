@@ -15,6 +15,7 @@ from typing import Any
 HET_GIO = 8.0
 _PROPLIST_LEASE = "mac-address,host-name,comment,address"
 _PROPLIST_WG = "name,interface,comment,allowed-address,current-endpoint-address,rx,tx,last-handshake,disabled"
+_PROPLIST_BRIDGE = "interface,bridge,disabled"
 _PROPLIST_KID = "mac-address,ip-address,bytes-down,bytes-up,rate-down,rate-up"
 
 
@@ -235,4 +236,14 @@ def wireguard_peers(p: Phien) -> list[dict[str, Any]]:
             "rx_bytes": _so(d.get("rx")), "tx_bytes": _so(d.get("tx")), "last_handshake_s": thoi_gian_giay(d.get("last-handshake")),
             "disabled": str(d.get("disabled", "")).strip().lower() in ("true", "yes"),
         })
+    return ra
+
+
+def bridge_ports(p: Phien) -> dict[str, str]:
+    """Cổng nào thuộc bridge nào: {tên cổng: tên bridge}. Bỏ dòng tắt, thiếu tên cổng hoặc tên bridge."""
+    ra: dict[str, str] = {}
+    for d in p.goi_doc("/interface/bridge/port/print", _PROPLIST_BRIDGE):
+        cong, cau = str(d.get("interface", "")).strip()[:40], str(d.get("bridge", "")).strip()[:40]
+        if cong and cau and str(d.get("disabled", "")).strip().lower() not in ("true", "yes"):
+            ra[cong] = cau
     return ra

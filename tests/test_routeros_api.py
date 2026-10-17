@@ -148,8 +148,6 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(R._ma_do_dai(200), (200 | 0x8000).to_bytes(2, "big"))
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class WireGuardTest(unittest.TestCase):
@@ -177,3 +175,63 @@ class WireGuardTest(unittest.TestCase):
         self.assertEqual(phone["allowed_address"], "192.16.0.2/32")
         self.assertIsNone(ds[1]["last_handshake_s"])
         self.assertTrue(ds[1]["disabled"])
+
+
+class BridgeTest(unittest.TestCase):
+    def test_doc_cong_bridge_chi_qua_print(self):
+        goi = []
+
+        class P:
+            def goi_doc(self, lenh, proplist=""):
+                goi.append(lenh)
+                return [
+                    {"interface": "ether2", "bridge": "BridgeLAN"},
+                    {"interface": "ether3", "bridge": "BridgeLAN", "disabled": "false"},
+                    {"interface": "ether5", "bridge": "BridgeKhach", "disabled": "true"},   # cổng tắt: không tính
+                    {"interface": "", "bridge": "BridgeLAN"},                                 # không tên cổng: bỏ
+                    {"interface": "ether4"},                                                  # không bridge: bỏ
+                    {"interface": "x" * 200, "bridge": "b" * 200},                            # chuỗi dài: cắt
+                ]
+        ra = R.bridge_ports(P())
+        self.assertEqual(goi, ["/interface/bridge/port/print"])
+        self.assertEqual(ra["ether2"], "BridgeLAN")
+        self.assertEqual(ra["ether3"], "BridgeLAN")
+        self.assertNotIn("ether5", ra)
+        self.assertNotIn("ether4", ra)
+        self.assertNotIn("", ra)
+        self.assertTrue(all(len(k) <= 40 and len(v) <= 40 for k, v in ra.items()))
+
+    def test_nguon_api_lay_bridge_cung_nhip_voi_ten_va_loi_bridge_khong_mat_ten(self):
+        from mikrotik_snmp import nguon_api as N
+
+        for ten in ("mo_phien", "ten_tu_dhcp", "kid_control", "wireguard_peers", "bridge_ports"):
+            self.addCleanup(setattr, N, ten, getattr(N, ten))       # trả lại hàm thật sau test, không để lẫn sang test khác
+
+        class Phien:
+            def dong(self):
+                pass
+        N.mo_phien = lambda *a, **k: Phien()
+        N.ten_tu_dhcp = lambda p: {"AA:BB:CC:DD:EE:01": {"comment": "May in", "host_name": "hp"}}
+        N.kid_control = lambda p: {}
+        N.wireguard_peers = lambda p: []
+        N.bridge_ports = lambda p: {"ether2": "BridgeLAN"}
+
+        async def chay_nen(f):
+            return f()
+        import asyncio
+        n = N.NguonApi("172.16.10.1", 8729, "doc", "mk", "vt", chay_nen)
+        d = asyncio.run(n.doc(True, True, True))
+        self.assertEqual(d["bridge"], {"ether2": "BridgeLAN"})
+        d = asyncio.run(n.doc(False, True, True))
+        self.assertNotIn("bridge", d)                         # chỉ đọc cùng nhịp với tên (cấu hình đổi chậm)
+
+        def loi(p):
+            raise R.ApiLoi("lệnh bị từ chối")
+        N.bridge_ports = loi
+        d = asyncio.run(n.doc(True, True, True))
+        self.assertIsNone(d["bridge"])                        # lỗi bridge: chỉ mất phần bridge
+        self.assertIn("AA:BB:CC:DD:EE:01", d["ten"])          # tên vẫn có
+
+
+if __name__ == "__main__":
+    unittest.main()

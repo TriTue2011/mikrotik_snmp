@@ -1,6 +1,6 @@
 """Nguồn API chỉ-đọc cho bộ thu thập: giữ MỘT phiên TLS bền, chạy trong luồng phụ, kèm chốt an toàn.
 
-Mỗi lần đọc: bộ đếm Kid Control (tốc độ từng máy) mỗi chu kỳ, tên DHCP lâu lâu một lần. Sau lỗi đăng nhập/vân tay thì nghỉ THOI_GIAN_TAM_DUNG giây.
+Mỗi lần đọc: bộ đếm Kid Control (tốc độ từng máy) mỗi chu kỳ, tên DHCP và cổng-thuộc-bridge lâu lâu một lần. Sau lỗi đăng nhập/vân tay thì nghỉ THOI_GIAN_TAM_DUNG giây.
 Kid Control chưa bật hoặc lỗi lệnh thì chỉ mất tốc độ từng máy, tên vẫn lấy được.
 """
 from __future__ import annotations
@@ -10,7 +10,8 @@ import time
 from typing import Any, Awaitable, Callable
 
 from .const import THOI_GIAN_TAM_DUNG
-from .routeros_api import ApiLoi, ApiLoiDangNhap, ApiLoiVanTay, Phien, kid_control, mo_phien, ten_tu_dhcp, wireguard_peers
+from .routeros_api import (ApiLoi, ApiLoiDangNhap, ApiLoiVanTay, Phien, bridge_ports, kid_control, mo_phien, ten_tu_dhcp,
+                           wireguard_peers)
 
 
 class ApiTamNgung(Exception):
@@ -36,6 +37,11 @@ class NguonApi:
                 ra: dict[str, Any] = {}
                 if lay_ten:
                     ra["ten"] = ten_tu_dhcp(self._phien)
+                    try:
+                        ra["bridge"] = bridge_ports(self._phien)    # cổng thuộc bridge nào: đổi chậm như tên, đọc cùng nhịp
+                    except ApiLoi:
+                        ra["bridge"] = None                         # lệnh bị từ chối: chỉ mất phần bridge, tên vẫn có
+                        self.dong()
                 if lay_kid:
                     try:
                         ra["kid"] = kid_control(self._phien)

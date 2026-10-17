@@ -18,12 +18,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .logic import slug
-from .thiet_bi import dinh_danh_cha, ten_thiet_bi
+from .thiet_bi import cha_cua_giao_dien, dinh_danh_cha, ten_thiet_bi
 
 
-def thiet_bi_giao_dien(entry: ConfigEntry, chi_so: int, ten: str) -> DeviceInfo:
+def thiet_bi_giao_dien(entry: ConfigEntry, chi_so: int, ten: str, du_lieu: dict[str, Any] | None) -> DeviceInfo:
     return DeviceInfo(identifiers={(DOMAIN, f"{entry.entry_id}_{chi_so}")}, name=ten, manufacturer="MikroTik",
-                      via_device=(DOMAIN, entry.entry_id))
+                      via_device=cha_cua_giao_dien(entry.entry_id, ten, du_lieu))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -80,7 +80,7 @@ class _GiaoDien(CoordinatorEntity):
         self._entry = entry
         gd = coordinator.data["interfaces"][chi_so]
         self._ma = f"{coordinator.tien_to}_{gd['kind']}_{gd['slug']}"
-        self._attr_device_info = thiet_bi_giao_dien(entry, chi_so, gd["name"])
+        self._attr_device_info = thiet_bi_giao_dien(entry, chi_so, gd["name"], coordinator.data)
 
     @property
     def _gd(self) -> dict[str, Any] | None:
@@ -324,7 +324,7 @@ class CamBienWifiMay(CoordinatorEntity, SensorEntity):
         if don_vi is not None:
             self._attr_state_class = SensorStateClass.MEASUREMENT
         may = _may_wifi(coordinator, mac) or {}
-        self._ten_cuoi = ten_thiet_bi(may, coordinator.data, mac)
+        self._ten_cuoi = ten_thiet_bi(may, mac)
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -494,7 +494,7 @@ class CamBienTocDoMay(CoordinatorEntity, SensorEntity):
         self._attr_name = "Tốc độ nhận (tải về)" if huong == "rx" else "Tốc độ gửi (tải lên)"
         self._attr_unique_id = f"{entry.entry_id}_{mac}_{huong}"
         self._attr_icon = "mdi:download-network" if huong == "rx" else "mdi:upload-network"
-        self._ten_cuoi = ten_thiet_bi(_may_cua(coordinator, mac), coordinator.data, mac)
+        self._ten_cuoi = ten_thiet_bi(_may_cua(coordinator, mac), mac)
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -549,7 +549,7 @@ class _Wg(CoordinatorEntity):
         self._ma = f"{coordinator.tien_to}_wireguard_{slug(ten)}"
         p = _peer_wg(coordinator, ten) or {}
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, f"{entry.entry_id}_wg_{slug(ten)}")}, name=f"WireGuard {p.get('comment') or ten}",
-                                            manufacturer="MikroTik", via_device=(DOMAIN, entry.entry_id))
+                                            manufacturer="MikroTik", via_device=dinh_danh_cha(entry.entry_id, p.get("interface"), coordinator.data))
 
     @property
     def available(self) -> bool:

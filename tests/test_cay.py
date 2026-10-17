@@ -77,6 +77,24 @@ class CayTest(unittest.TestCase):
         self.assertEqual(nut["ether2"]["parent"], "router")
         self.assertEqual(nut["BridgeLAN"]["kind"], "bridge")
 
+    def test_cong_nam_trong_bridge_thi_cha_la_bridge(self):
+        cay = xay_cay(GIAO_DIEN, BANG_MAC, ARP, ZTE, "MikroTik", bridge_cua={"ether2": "BridgeLAN", "ether4": "BridgeLAN"})
+        nut = {n["id"]: n for n in cay["nodes"]}
+        self.assertEqual(nut["ether2"]["parent"], "BridgeLAN")
+        self.assertEqual(nut["ether4"]["parent"], "BridgeLAN")
+        self.assertEqual(nut["BridgeLAN"]["parent"], "router")          # chính bridge và cổng ngoài bridge giữ cha là router
+        self.assertEqual(nut["WAN-ETHER1"]["parent"], "router")
+        self.assertEqual(nut["zte"]["parent"], "ether4")                # ZTE vẫn là con của cổng nó cắm vào
+        self.assertEqual(theo_mac(cay)["AA:00:00:00:00:11"]["parent"], "zte")
+
+    def test_bridge_khong_co_trong_snmp_hoac_vong_thi_ve_router(self):
+        cay = xay_cay(GIAO_DIEN, BANG_MAC, ARP, None, "MikroTik",
+                      bridge_cua={"ether2": "BridgeMa", "BridgeLAN": "BridgeLAN", "ether4": "ether2"})
+        nut = {n["id"]: n for n in cay["nodes"]}
+        self.assertEqual(nut["ether2"]["parent"], "router")             # bridge không có trong SNMP: không bịa cha
+        self.assertEqual(nut["BridgeLAN"]["parent"], "router")          # bridge tự trỏ vào mình: bỏ
+        self.assertEqual(nut["ether4"]["parent"], "router")             # cha không phải bridge: bỏ
+
     def test_khong_khai_zte_thi_chi_con_cua_cong(self):
         cay = xay_cay(GIAO_DIEN, BANG_MAC, ARP, None, "MikroTik")
         self.assertNotIn("zte", {n["id"] for n in cay["nodes"]})

@@ -41,7 +41,7 @@ class KetNoiCong(CoordinatorEntity, BinarySensorEntity):
         self._chi_so = chi_so
         gd = coordinator.data["interfaces"][chi_so]
         self._attr_unique_id = f"{entry.entry_id}_{chi_so}_connection"
-        self._attr_device_info = thiet_bi_giao_dien(entry, chi_so, gd["name"])
+        self._attr_device_info = thiet_bi_giao_dien(entry, chi_so, gd["name"], coordinator.data)
         self.entity_id = f"binary_sensor.{coordinator.tien_to}_{gd['kind']}_{gd['slug']}_connection"
 
     @property

@@ -3,6 +3,7 @@
 Logic thuần, không phụ thuộc Home Assistant. Quy tắc:
 - MAC có trong danh sách máy WiFi của ZTE → là con của nút «zte», mang thêm tên máy, băng tần, tín hiệu, chế độ, thời gian kết nối.
 - MAC còn lại → là con của cổng nó được học trên bảng MAC; không biết cổng thì là con của router.
+- Cổng thuộc bridge (theo API) là con của bridge; không rõ thì con của router.
 - Nút ZTE là con của cổng mà ZTE cắm vào (suy từ IP của ZTE → MAC trong ARP → cổng trong bảng MAC); không suy được thì con của router.
 - ZTE không tự là «máy» của chính nó.
 Tên: tự đặt > ghi chú DHCP trên MikroTik > tên ZTE > host-name. Tốc độ từng máy (rx = tải về máy) lấy từ Kid Control nếu có.
@@ -37,7 +38,8 @@ def _khoa_ip(ip: str):
 
 def xay_cay(giao_dien: dict[int, dict[str, Any]], bang_mac: dict[str, list[str]], arp: dict[str, str],
             zte: dict[str, Any] | None, ten_router: str, ten_may: dict[str, str] | None = None,
-            ten_mik: dict[str, dict[str, str]] | None = None, toc_do: dict[str, dict[str, float | None]] | None = None) -> dict[str, Any]:
+            ten_mik: dict[str, dict[str, str]] | None = None, toc_do: dict[str, dict[str, float | None]] | None = None,
+            bridge_cua: dict[str, str] | None = None) -> dict[str, Any]:
     cong_cua = _cong_cua(bang_mac)
     ten_may = {_hoa(m): t for m, t in (ten_may or {}).items()}
     ten_mik = {_hoa(m): v for m, v in (ten_mik or {}).items()}
@@ -46,11 +48,16 @@ def xay_cay(giao_dien: dict[int, dict[str, Any]], bang_mac: dict[str, list[str]]
     tim_mac_theo_ip = {ip: mac for mac, ip in arp.items()}
 
     nodes: list[dict[str, Any]] = [{"id": ROUTER, "kind": "router", "name": ten_router, "parent": None}]
-    ten_cong = set()
+    ten_cong = {gd["name"] for gd in giao_dien.values()}
+    ten_bridge = {gd["name"] for gd in giao_dien.values() if gd.get("kind") == "bridge"}
+    bridge_cua = bridge_cua or {}
     for chi_so in sorted(giao_dien):
         gd = giao_dien[chi_so]
-        ten_cong.add(gd["name"])
-        nodes.append({"id": gd["name"], "kind": gd.get("kind", "port"), "name": gd["name"], "parent": ROUTER, "up": gd.get("up")})
+        # Cổng thuộc bridge thì là con của bridge; chỉ nhận khi đó đúng là giao diện bridge trong SNMP và không tạo vòng (bridge tự trỏ mình,
+        # bridge nằm trong bridge khác).
+        cau = bridge_cua.get(gd["name"])
+        cha = cau if cau in ten_bridge and cau != gd["name"] and cau not in bridge_cua else ROUTER
+        nodes.append({"id": gd["name"], "kind": gd.get("kind", "port"), "name": gd["name"], "parent": cha, "up": gd.get("up")})
 
     zte_macs: set[str] = set()
     zte_clients: dict[str, dict[str, Any]] = {}

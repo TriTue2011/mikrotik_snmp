@@ -18,7 +18,7 @@ from .const import (
     PORT_MAC_DINH, PRIV_MAC_DINH, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoi, SnmpLoiDangNhap
-from .thiet_bi import dinh_danh_cha
+from .thiet_bi import cha_cua_giao_dien, dinh_danh_cha
 from .logic import phan_tich_ten_may
 from .thu_thap import LoiDuLieu, ThuThap
 from .zte_api import ZteE2633
@@ -79,12 +79,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manufacturer="MikroTik",
         model=core.get("descr"),
     )
-    # Dựng sẵn thiết bị cổng và ZTE để thực thể con gắn via_device được (cổng trước, rồi ZTE là con của cổng).
+    # Dựng sẵn thiết bị giao diện và ZTE để thực thể con gắn via_device được: bridge (con của router) trước, rồi cổng (con của bridge
+    # hoặc router), rồi ZTE là con của cổng.
     so_thiet_bi = dr.async_get(hass)
     du_lieu = coordinator.data or {}
-    for chi_so, gd in (du_lieu.get("interfaces") or {}).items():
+    goc = (DOMAIN, entry.entry_id)
+    cha_cua = {chi_so: cha_cua_giao_dien(entry.entry_id, gd["name"], du_lieu) for chi_so, gd in (du_lieu.get("interfaces") or {}).items()}
+    for chi_so in sorted(cha_cua, key=lambda c: cha_cua[c] != goc):
         so_thiet_bi.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"{entry.entry_id}_{chi_so}")},
-                               name=gd["name"], manufacturer="MikroTik", via_device=(DOMAIN, entry.entry_id))
+                               name=du_lieu["interfaces"][chi_so]["name"], manufacturer="MikroTik", via_device=cha_cua[chi_so])
     if coordinator.co_zte:
         nut_zte = next((n for n in (du_lieu.get("tree") or {}).get("nodes", []) if n["id"] == "zte"), {})
         ap = (du_lieu.get("zte") or {}).get("ap") or {}

@@ -55,7 +55,7 @@ class MayLan(CoordinatorEntity, ScannerEntity):
         self._entry_id = entry.entry_id
         self._attr_unique_id = f"{entry.entry_id}_{mac}"
         may = self._may or {}
-        self._ten_cuoi = ten_thiet_bi(may, coordinator.data, mac)
+        self._ten_cuoi = ten_thiet_bi(may, mac)
         self._cha = dinh_danh_cha(entry.entry_id, may.get("parent"), coordinator.data)
 
     @property
@@ -76,7 +76,7 @@ class MayLan(CoordinatorEntity, ScannerEntity):
             so_thiet_bi = dr.async_get(self.hass)
             ket_noi = {(CONNECTION_NETWORK_MAC, format_mac(self._mac))}
             moi = dinh_danh_cha(self._entry_id, may.get("parent"), self.coordinator.data)
-            ten_moi = ten_thiet_bi(may, self.coordinator.data, self._mac)
+            ten_moi = ten_thiet_bi(may, self._mac)
             if moi != self._cha or ten_moi != self._ten_cuoi:
                 dev = so_thiet_bi.async_get_device(connections=ket_noi)
                 if dev is not None:

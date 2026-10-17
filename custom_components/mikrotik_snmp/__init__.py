@@ -13,11 +13,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     AUTH_MAC_DINH, CHU_KY_MAC_DINH, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL, CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_PORT,
-    CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, DOMAIN,
+    CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TEN_MAY, CONF_TIEN_TO, CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, DOMAIN,
     PORT_MAC_DINH, PRIV_MAC_DINH, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoi, SnmpLoiDangNhap
 from .thiet_bi import dinh_danh_cha
+from .logic import phan_tich_ten_may
 from .thu_thap import LoiDuLieu, ThuThap
 from .zte_api import ZteE2633
 from .zte_nguon import NguonZte
@@ -47,7 +48,7 @@ class MikrotikSnmpCoordinator(DataUpdateCoordinator):
             zte = NguonZte(ZteE2633(cfg[CONF_ZTE_HOST], cfg.get(CONF_ZTE_TEN, ""), cfg.get(CONF_ZTE_MAT_KHAU, ""),
                                     xac_minh_ssl=cfg.get(CONF_ZTE_SSL, False)),
                            cfg[CONF_ZTE_HOST], hass.async_add_executor_job)
-        self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None, zte=zte)
+        self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None, zte=zte, ten_may=phan_tich_ten_may(cfg.get(CONF_TEN_MAY, "")))
 
     async def _async_update_data(self):
         try:

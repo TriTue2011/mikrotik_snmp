@@ -35,8 +35,9 @@ def _khoa_ip(ip: str):
 
 
 def xay_cay(giao_dien: dict[int, dict[str, Any]], bang_mac: dict[str, list[str]], arp: dict[str, str],
-            zte: dict[str, Any] | None, ten_router: str) -> dict[str, Any]:
+            zte: dict[str, Any] | None, ten_router: str, ten_may: dict[str, str] | None = None) -> dict[str, Any]:
     cong_cua = _cong_cua(bang_mac)
+    ten_may = {_hoa(m): t for m, t in (ten_may or {}).items()}
     arp = {_hoa(m): ip for m, ip in arp.items()}
     tim_mac_theo_ip = {ip: mac for mac, ip in arp.items()}
 
@@ -77,7 +78,7 @@ def xay_cay(giao_dien: dict[int, dict[str, Any]], bang_mac: dict[str, list[str]]
             "mac": mac, "ip": ip, "interface": cong,
             "parent": ZTE if w else (cong if cong in ten_cong else ROUTER),
             "wifi": bool(w), "source": "zte" if w else "mik",
-            "name": (w or {}).get("name") or "",
+            "name": ten_may.get(mac) or (w or {}).get("name") or "",
             "band": (w or {}).get("band"), "rssi": (w or {}).get("rssi"),
             "mode": (w or {}).get("mode"), "assoc_s": (w or {}).get("assoc_s"),
         })

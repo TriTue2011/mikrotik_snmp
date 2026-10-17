@@ -33,7 +33,7 @@ _TRANG_THAI_LOI = {"ZteLoiDangNhap": "loi_dang_nhap", "ZteLoiKetNoi": "loi_ket_n
 
 class ThuThap:
     def __init__(self, may_khach: MayKhach, cong_chon: list[str] | None = None, dong_ho: Callable[[], float] = time.monotonic,
-                 zte: NguonZte | None = None):
+                 zte: NguonZte | None = None, ten_may: dict[str, str] | None = None):
         self._mk = may_khach
         self._chon = set(cong_chon or [])      # rỗng = tất cả
         self._dong_ho = dong_ho
@@ -43,6 +43,7 @@ class ThuThap:
         self._lan_cham = -1e18
         self._lan_thiet_bi = -1e18
         self._zte = zte
+        self._ten_may = dict(ten_may or {})
         self._lan_zte = -1e18
         self._du_lieu_zte: dict[str, Any] | None = (
             {"host": zte.host, "trang_thai": "chua_doc", "ap": {}, "clients": []} if zte else None)
@@ -68,7 +69,11 @@ class ThuThap:
         """Dò danh sách giao diện (tên, loại, ghi chú) và dòng RAM."""
         ten = await self._mk.walk(L.IF_NAME)
         loai = await self._mk.walk(L.IF_TYPE)
-        gd = L.phan_tich_giao_dien(ten, loai)
+        try:
+            mtu = await self._mk.walk(L.IF_MTU)
+        except Exception:  # noqa: BLE001 - MTU chỉ để loại loopback
+            mtu = {}
+        gd = L.phan_tich_giao_dien(ten, loai, mtu)
         if not gd:
             raise LoiDuLieu("router không trả danh sách cổng (ifName): kiểm quyền SNMP và địa chỉ")
         try:
@@ -180,6 +185,6 @@ class ThuThap:
             g.update(self._cham.get(i, {}))
             ra[i] = g
         ten_router = self._loi_he_thong.get("name") or "MikroTik"
-        cay = xay_cay(ra, self._thiet_bi["bang_mac"], self._thiet_bi["arp"], self._du_lieu_zte, ten_router)
+        cay = xay_cay(ra, self._thiet_bi["bang_mac"], self._thiet_bi["arp"], self._du_lieu_zte, ten_router, self._ten_may)
         return {"interfaces": ra, "core": dict(self._loi_he_thong), "devices": dict(self._thiet_bi), "tree": cay,
                 "zte": dict(self._du_lieu_zte) if self._du_lieu_zte else None}

@@ -14,6 +14,8 @@ SYS_NAME = "1.3.6.1.2.1.1.5.0"
 IF_NAME = "1.3.6.1.2.1.31.1.1.1.1"
 IF_ALIAS = "1.3.6.1.2.1.31.1.1.1.18"      # ghi chú (comment) của giao diện
 IF_TYPE = "1.3.6.1.2.1.2.2.1.3"
+IF_MTU = "1.3.6.1.2.1.2.2.1.4"
+MTU_LOOPBACK = 65000                        # giao diện loopback có MTU rất lớn (65536)
 IF_OPER = "1.3.6.1.2.1.2.2.1.8"           # 1 = up
 IF_HC_IN = "1.3.6.1.2.1.31.1.1.1.6"       # octet, 64-bit
 IF_HC_OUT = "1.3.6.1.2.1.31.1.1.1.10"
@@ -87,7 +89,7 @@ def tinh_toc_do_mbit(truoc: tuple[float, int] | None, nay: tuple[float, int]) ->
     return round(delta * 8 / dt / 1_000_000, 3)
 
 
-def phan_tich_giao_dien(ten: dict[str, Any], loai: dict[str, Any]) -> dict[int, dict[str, Any]]:
+def phan_tich_giao_dien(ten: dict[str, Any], loai: dict[str, Any], mtu: dict[str, Any] | None = None) -> dict[int, dict[str, Any]]:
     """Bảng giao diện từ hai lần duyệt: {oid ifName: tên}, {oid ifType: số}. Trả {ifIndex: {name, kind, if_type, slug}}.
     Bỏ giao diện loopback. Hai giao diện trùng tên rút gọn thì thêm đuôi chỉ số để không trùng entity_id."""
     ra: dict[int, dict[str, Any]] = {}
@@ -97,8 +99,9 @@ def phan_tich_giao_dien(ten: dict[str, Any], loai: dict[str, Any]) -> dict[int, 
         if chi_so is None or not chi_so.isdigit():
             continue
         loai_so = _so(loai.get(f"{IF_TYPE}.{chi_so}"))
-        if loai_so == IF_TYPE_LOOPBACK:
-            continue
+        so_mtu = _so((mtu or {}).get(f"{IF_MTU}.{chi_so}"))
+        if loai_so == IF_TYPE_LOOPBACK or (so_mtu is not None and so_mtu >= MTU_LOOPBACK):
+            continue   # loopback: loại theo cấu trúc (loại 24 hoặc MTU lớn), không theo danh sách tên
         ten_cong = lam_sach(gia_tri) or f"if{chi_so}"
         ma = slug(ten_cong)
         if ma in da_dung:
@@ -237,3 +240,18 @@ def danh_sach_thiet_bi(arp: dict[str, str], bang_mac: dict[str, list[str]]) -> l
         ip = arp.get(mac, "")
         return (tuple(int(x) for x in ip.split(".")) if ip else (999,), mac)
     return [{"mac": m, "ip": arp.get(m, ""), "interface": cong_cua.get(m, "")} for m in sorted(mac_het, key=khoa)]
+
+
+def phan_tich_ten_may(van_ban: Any) -> dict[str, str]:
+    """Văn bản «MAC = Tên» mỗi dòng → {MAC hoa: Tên}. Dòng sai khuôn, MAC lạ, tên rỗng hay dòng ghi chú (#) bị bỏ; tên cắt 40 ký tự."""
+    ra: dict[str, str] = {}
+    for dong in str(van_ban or "").splitlines():
+        dong = dong.strip()
+        if not dong or dong.startswith("#") or "=" not in dong:
+            continue
+        mac_tho, _, ten = dong.partition("=")
+        mac = mac_tu_hex(mac_tho.strip().replace(":", "").replace("-", "").replace(".", ""))
+        ten = lam_sach(ten, 40)
+        if mac and ten:
+            ra[mac] = ten
+    return ra

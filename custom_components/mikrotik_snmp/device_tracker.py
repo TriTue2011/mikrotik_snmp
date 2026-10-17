@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .thiet_bi import dinh_danh_cha
+from .thiet_bi import dinh_danh_cha, ten_thiet_bi
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -55,7 +55,7 @@ class MayLan(CoordinatorEntity, ScannerEntity):
         self._entry_id = entry.entry_id
         self._attr_unique_id = f"{entry.entry_id}_{mac}"
         may = self._may or {}
-        self._ten_cuoi = may.get("name") or may.get("ip") or mac
+        self._ten_cuoi = ten_thiet_bi(may, coordinator.data, mac)
         self._cha = dinh_danh_cha(entry.entry_id, may.get("parent"), coordinator.data)
 
     @property
@@ -73,14 +73,22 @@ class MayLan(CoordinatorEntity, ScannerEntity):
     def _handle_coordinator_update(self) -> None:
         may = self._may
         if may is not None:
+            so_thiet_bi = dr.async_get(self.hass)
+            ket_noi = {(CONNECTION_NETWORK_MAC, format_mac(self._mac))}
             moi = dinh_danh_cha(self._entry_id, may.get("parent"), self.coordinator.data)
-            if moi != self._cha:                       # máy đổi chỗ (WiFi ↔ có dây, đổi cổng): cập nhật cây thiết bị
-                so_thiet_bi = dr.async_get(self.hass)
-                dev = so_thiet_bi.async_get_device(connections={(CONNECTION_NETWORK_MAC, format_mac(self._mac))})
-                cha = so_thiet_bi.async_get_device(identifiers={moi})
-                if dev is not None and cha is not None:
-                    so_thiet_bi.async_update_device(dev.id, via_device_id=cha.id)
-                self._cha = moi
+            ten_moi = ten_thiet_bi(may, self.coordinator.data, self._mac)
+            if moi != self._cha or ten_moi != self._ten_cuoi:
+                dev = so_thiet_bi.async_get_device(connections=ket_noi)
+                if dev is not None:
+                    cap_nhat: dict[str, Any] = {}
+                    cha = so_thiet_bi.async_get_device(identifiers={moi})
+                    if moi != self._cha and cha is not None:        # máy đổi chỗ (WiFi ↔ có dây, đổi cổng): cập nhật cây
+                        cap_nhat["via_device_id"] = cha.id
+                    if ten_moi != self._ten_cuoi and dev.name_by_user is None:   # không ghi đè tên người dùng đã đặt tay
+                        cap_nhat["name"] = ten_moi
+                    if cap_nhat:
+                        so_thiet_bi.async_update_device(dev.id, **cap_nhat)
+                self._cha, self._ten_cuoi = moi, ten_moi
         super()._handle_coordinator_update()
 
     @property

@@ -62,8 +62,10 @@
         "title": "Tuỳ chọn MikroTik SNMP",
         "data": {
           "chu_ky": "Chu kỳ đọc (giây)",
-          "cong": "Cổng hiển thị"
-        }
+          "cong": "Cổng hiển thị",
+          "ten_may": "Tên thiết bị (mỗi dòng: MAC = Tên)"
+        },
+        "description": "Đặt tên cho máy theo MAC, ví dụ: AA:BB:CC:DD:EE:01 = Máy in. Dòng bắt đầu bằng # là ghi chú. Tên này ưu tiên hơn tên từ ZTE."
       }
     }
   }

@@ -12,7 +12,7 @@ from homeassistant.helpers import selector
 from . import logic as L
 from .const import (
     AUTH_MAC_DINH, AUTH_PROTOCOLS, CHU_KY_LON_NHAT, CHU_KY_MAC_DINH, CHU_KY_NHO_NHAT, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL,
-    CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_PORT, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN,
+    CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_TEN_MAY, CONF_PORT, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN,
     CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, PORT_MAC_DINH, PRIV_MAC_DINH, PRIV_PROTOCOLS, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoiDangNhap, SnmpLoiKetNoi
@@ -171,4 +171,6 @@ class MikrotikSnmpOptionsFlow(OptionsFlow):
                 vol.Coerce(int), vol.Range(min=CHU_KY_NHO_NHAT, max=CHU_KY_LON_NHAT)),
             vol.Required(CONF_CONG, default=hien_tai.get(CONF_CONG) or ten_cong): selector.SelectSelector(
                 selector.SelectSelectorConfig(options=ten_cong, multiple=True, mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Optional(CONF_TEN_MAY, default=hien_tai.get(CONF_TEN_MAY, "")): selector.TextSelector(
+                selector.TextSelectorConfig(multiline=True)),
         }))

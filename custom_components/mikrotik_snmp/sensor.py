@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .thiet_bi import dinh_danh_cha
+from .thiet_bi import dinh_danh_cha, ten_thiet_bi
 
 
 def thiet_bi_giao_dien(entry: ConfigEntry, chi_so: int, ten: str) -> DeviceInfo:
@@ -319,7 +319,7 @@ class CamBienWifiMay(CoordinatorEntity, SensorEntity):
         if don_vi is not None:
             self._attr_state_class = SensorStateClass.MEASUREMENT
         may = _may_wifi(coordinator, mac) or {}
-        self._ten_cuoi = may.get("name") or may.get("ip") or mac
+        self._ten_cuoi = ten_thiet_bi(may, coordinator.data, mac)
 
     @property
     def device_info(self) -> DeviceInfo:

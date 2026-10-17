@@ -62,8 +62,10 @@
         "title": "MikroTik SNMP options",
         "data": {
           "chu_ky": "Poll interval (seconds)",
-          "cong": "Ports to show"
-        }
+          "cong": "Ports to show",
+          "ten_may": "Device names (one per line: MAC = Name)"
+        },
+        "description": "Name devices by MAC, e.g. AA:BB:CC:DD:EE:01 = Printer. Lines starting with # are comments. These names win over names from the ZTE."
       }
     }
   }

@@ -112,3 +112,33 @@ class CayTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TenMayTest(unittest.TestCase):
+    def test_ten_theo_mac_uu_tien_hon_ten_zte(self):
+        ten = {"AA:00:00:00:00:01": "Máy in", "AA:00:00:00:00:11": "Honor của Tuệ"}
+        c = {m["mac"]: m for m in xay_cay(GIAO_DIEN, BANG_MAC, ARP, ZTE, "MikroTik", ten)["clients"]}
+        self.assertEqual(c["AA:00:00:00:00:01"]["name"], "Máy in")          # máy có dây: tên tự đặt
+        self.assertEqual(c["AA:00:00:00:00:11"]["name"], "Honor của Tuệ")   # ghi đè tên ZTE
+        self.assertEqual(c["AA:00:00:00:00:12"]["name"], "Galaxy")          # không đặt thì dùng tên ZTE
+
+    def test_ten_tu_dat_khong_phan_biet_hoa_thuong_mac(self):
+        c = {m["mac"]: m for m in xay_cay(GIAO_DIEN, BANG_MAC, ARP, None, "MikroTik", {"aa:00:00:00:00:03": "NAS"})["clients"]}
+        self.assertEqual(c["AA:00:00:00:00:03"]["name"], "NAS")
+
+    def test_phan_tich_van_ban_ten(self):
+        from mikrotik_snmp.logic import phan_tich_ten_may
+        vb = "aa:bb:cc:dd:ee:01 = Máy in\nAA-BB-CC-DD-EE-02=NAS Synology\n  \nkhong-phai-mac=Bo\nAA:BB:CC:DD:EE:03 =   \n# ghi chú"
+        self.assertEqual(phan_tich_ten_may(vb), {"AA:BB:CC:DD:EE:01": "Máy in", "AA:BB:CC:DD:EE:02": "NAS Synology"})
+        self.assertEqual(phan_tich_ten_may(""), {})
+        self.assertEqual(len(next(iter(phan_tich_ten_may("AA:BB:CC:DD:EE:01=" + "x" * 200).values()))), 40)
+
+
+class LoopbackTest(unittest.TestCase):
+    def test_bo_giao_dien_loopback_theo_mtu(self):
+        from mikrotik_snmp import logic as L
+        ten = {f"{L.IF_NAME}.1": "lo", f"{L.IF_NAME}.2": "ether1"}
+        loai = {f"{L.IF_TYPE}.1": 1, f"{L.IF_TYPE}.2": 6}                    # lo báo loại «other», không phải 24
+        mtu = {f"{L.IF_MTU}.1": 65536, f"{L.IF_MTU}.2": 1500}
+        gd = L.phan_tich_giao_dien(ten, loai, mtu)
+        self.assertEqual([g["name"] for g in gd.values()], ["ether1"])

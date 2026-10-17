@@ -50,11 +50,21 @@ Mật khẩu không vào log. Để trống IP để bỏ qua; khi ZTE lỗi, ph
 1. HACS → Kho tuỳ chỉnh → `https://github.com/TriTue2011/mikrotik_snmp` → loại *Integration* → tải → khởi động lại Home Assistant.
 2. Cài đặt → Thiết bị & dịch vụ → Thêm tích hợp → **Mạng LAN: MikroTik (SNMP) + ZTE E2633**: nhập IP router, người dùng (`hass`), hai mật khẩu;
    (tuỳ chọn) IP và tài khoản ZTE; rồi chọn cổng.
-3. Nút bánh răng: đổi chu kỳ đọc (mặc định 5 giây) và cổng hiển thị.
+3. Nút bánh răng: đổi chu kỳ đọc (mặc định 5 giây), cổng hiển thị, và **Tên thiết bị** (mỗi dòng `MAC = Tên`; SNMP không có tên máy nên anh tự đặt,
+   hoặc lấy tên từ ZTE cho máy WiFi). Tên thiết bị hiển thị dạng `ether3 · Máy in` nên danh sách thiết bị của Home Assistant xếp các máy cùng cổng liền nhau.
 
 Cần thư viện `pysnmp`: Home Assistant đã có nếu từng dùng tích hợp «SNMP». Nếu thiếu, thêm một cảm biến SNMP bất kỳ một lần để Home Assistant cài nó.
 
-## Dùng với card (không cần tích hợp MikroTik cũ, không cần `zte_e2633` riêng)
+## Dùng với card — tự nối thiết bị vào sơ đồ (card từ 0.8.0)
+```yaml
+type: custom:mikrotik-topo-lan-card
+prefix: mikrotik_router
+topo_sensor: sensor.mikrotik_router_cay_thiet_bi   # card tự dựng hộp (cổng, ZTE) và đặt từng máy vào hộp của cha nó
+port_names: { ether2: SW1, ether4: SW2, bridgelan: BRIDGE LAN }
+```
+Thiết bị mới xuất hiện trong mạng thì tự có thực thể và tự nối vào sơ đồ, không cần khai gì thêm.
+
+## Cách cũ: khai nguồn tay (không cần `topo_sensor`)
 ```yaml
 type: custom:mikrotik-topo-lan-card
 prefix: mikrotik_router                       # trùng «Tiền tố» khi thêm tích hợp

@@ -12,6 +12,7 @@ CONF_PRIV_PROTOCOL = "priv_protocol"
 CONF_CHU_KY = "chu_ky"
 CONF_TIEN_TO = "tien_to"
 CONF_CONG = "cong"
+CONF_TEN_MAY = "ten_may"
 
 CONF_ZTE_HOST = "zte_host"
 CONF_ZTE_TEN = "zte_ten"

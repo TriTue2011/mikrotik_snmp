@@ -276,3 +276,21 @@ def toc_do_tu_kid(truoc: dict[str, tuple[float, int]], kid: dict[str, dict[str, 
             mot[f"{huong}_mbps"] = gia
         ra[mac] = mot
     return ra
+
+
+def toc_do_wg(truoc: dict[str, tuple[float, int]], peers: list[dict[str, Any]], t: float) -> list[dict[str, Any]]:
+    """Gắn rx_mbps/tx_mbps (từ hai lần đọc byte) và connected (bắt tay trong 3 phút) cho mỗi peer WireGuard. Peer vô hiệu hoá → không đo."""
+    ra: list[dict[str, Any]] = []
+    for p in peers:
+        mot = dict(p)
+        for huong, khoa in (("rx", "rx_bytes"), ("tx", "tx_bytes")):
+            so = _so(p.get(khoa))
+            mot[f"{huong}_mbps"] = None
+            if so is not None and not p.get("disabled"):
+                k = f"wg|{p['name']}|{huong}"
+                mot[f"{huong}_mbps"] = tinh_toc_do_mbit(truoc.get(k), (t, so))
+                truoc[k] = (t, so)
+        hs = p.get("last_handshake_s")
+        mot["connected"] = bool(hs is not None and hs <= 180 and not p.get("disabled"))
+        ra.append(mot)
+    return ra

@@ -10,7 +10,7 @@ import time
 from typing import Any, Awaitable, Callable
 
 from .const import THOI_GIAN_TAM_DUNG
-from .routeros_api import ApiLoi, ApiLoiDangNhap, ApiLoiVanTay, Phien, kid_control, mo_phien, ten_tu_dhcp
+from .routeros_api import ApiLoi, ApiLoiDangNhap, ApiLoiVanTay, Phien, kid_control, mo_phien, ten_tu_dhcp, wireguard_peers
 
 
 class ApiTamNgung(Exception):
@@ -28,7 +28,7 @@ class NguonApi:
         self._phien: Phien | None = None
         self._khoa = threading.Lock()
 
-    def _doc_dong_bo(self, lay_ten: bool, lay_kid: bool) -> dict[str, Any]:
+    def _doc_dong_bo(self, lay_ten: bool, lay_kid: bool, lay_wg: bool = False) -> dict[str, Any]:
         with self._khoa:
             try:
                 if self._phien is None:
@@ -42,6 +42,12 @@ class NguonApi:
                     except ApiLoi:
                         ra["kid"] = None            # Kid Control chưa bật / lệnh bị từ chối: chỉ mất tốc độ từng máy
                         self.dong()                 # phiên có thể hỏng: lần sau nối lại
+                if lay_wg:
+                    try:
+                        ra["wg"] = wireguard_peers(self._phien)
+                    except ApiLoi:
+                        ra["wg"] = None             # không có WireGuard / lệnh bị từ chối: chỉ mất phần VPN
+                        self.dong()
                 return ra
             except Exception:
                 self.dong()
@@ -50,11 +56,11 @@ class NguonApi:
     def _host_api(self) -> str:
         return self.host
 
-    async def doc(self, lay_ten: bool, lay_kid: bool) -> dict[str, Any]:
+    async def doc(self, lay_ten: bool, lay_kid: bool, lay_wg: bool = False) -> dict[str, Any]:
         if self._dong_ho() < self._tam_dung_den:
             raise ApiTamNgung()
         try:
-            return await self._chay(lambda: self._doc_dong_bo(lay_ten, lay_kid))
+            return await self._chay(lambda: self._doc_dong_bo(lay_ten, lay_kid, lay_wg))
         except (ApiLoiDangNhap, ApiLoiVanTay):
             self._tam_dung_den = self._dong_ho() + THOI_GIAN_TAM_DUNG
             raise

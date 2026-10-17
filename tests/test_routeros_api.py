@@ -150,3 +150,30 @@ class ApiTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WireGuardTest(unittest.TestCase):
+    def test_thoi_gian_handshake(self):
+        for vao, ra in (("1m33s", 93), ("00:01:33", 93), ("2h5m", 7500), ("1d", 86400), ("45s", 45), ("1w2d", 777600),
+                        ("never", None), ("", None), (None, None), ("abc", None)):
+            self.assertEqual(R.thoi_gian_giay(vao), ra, vao)
+
+    def test_doc_peer(self):
+        class P:
+            def goi_doc(self, lenh, proplist=""):
+                assert lenh == "/interface/wireguard/peers/print"
+                return [
+                    {"name": "phone", "interface": "wg-home", "comment": "Phone", "allowed-address": "192.16.0.2/32",
+                     "current-endpoint-address": "123.16.0.35", "rx": "1103397888", "tx": "546222080", "last-handshake": "42s"},
+                    {"name": "mik-sg", "interface": "mik-sg", "comment": "surfshark SING", "allowed-address": "0.0.0.0/0",
+                     "rx": "0", "tx": "0", "last-handshake": "", "disabled": "true"},
+                    {"interface": "wg-home"},                                          # không tên: bỏ
+                ]
+        ds = R.wireguard_peers(P())
+        self.assertEqual([p["name"] for p in ds], ["phone", "mik-sg"])
+        phone = ds[0]
+        self.assertEqual((phone["rx_bytes"], phone["tx_bytes"], phone["last_handshake_s"]), (1103397888, 546222080, 42))
+        self.assertEqual(phone["interface"], "wg-home")
+        self.assertEqual(phone["allowed_address"], "192.16.0.2/32")
+        self.assertIsNone(ds[1]["last_handshake_s"])
+        self.assertTrue(ds[1]["disabled"])

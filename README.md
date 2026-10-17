@@ -53,6 +53,9 @@ SNMP không có tên máy và không có bộ đếm theo từng máy. Hai thứ
 - **Tốc độ từng máy** (rx = tải về máy, tx = tải lên): **Kid Control** (`/ip kid-control device`): tích hợp tự tính Mbit/s từ bộ đếm byte mỗi chu kỳ (hoặc dùng `rate-up/down` của router
   ở lần đọc đầu). Cần Kid Control đã bật một lần trên router (`/ip kid-control add name=ca-nha mon=0s-1d tue=0s-1d wed=0s-1d thu=0s-1d fri=0s-1d sat=0s-1d sun=0s-1d`; không đặt giới hạn nên chỉ đo).
 
+- **WireGuard**: danh sách peer (tên, ghi chú, giao diện, địa chỉ cho phép), tốc độ nhận/gửi (Mbit/s, tính từ byte), lần bắt tay gần nhất và trạng thái kết nối (bắt tay trong 3 phút).
+  Mã thực thể theo quy ước card (`sensor.<tiền_tố>_wireguard_<peer>_rx|tx|last_handshake`, `binary_sensor…_connected`); giao diện có peer được đánh dấu `wg` theo dữ liệu.
+
 Bảo mật: tài khoản **chỉ `api,read`** giới hạn theo IP Home Assistant:
 ```
 /user group add name=ha-doc policy=api,read

@@ -17,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .logic import slug
 from .thiet_bi import dinh_danh_cha, ten_thiet_bi
 
 
@@ -65,6 +66,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(he_thong)
     _them_cam_bien_wifi(hass, entry, coordinator, async_add_entities)
     if coordinator.co_api:
+        _them_cam_bien_wireguard(hass, entry, coordinator, async_add_entities)
         _them_cam_bien_toc_do_may(hass, entry, coordinator, async_add_entities)
         async_add_entities([ApiTrangThaiSensor(coordinator, entry)])
 
@@ -508,3 +510,90 @@ class CamBienTocDoMay(CoordinatorEntity, SensorEntity):
     def native_value(self) -> float | None:
         may = _may_cua(self.coordinator, self._mac)
         return may.get(f"{self._huong}_mbps") if may else None
+
+
+def _peer_wg(coordinator, ten: str) -> dict[str, Any] | None:
+    for p in (coordinator.data or {}).get("wireguard", []):
+        if p["name"] == ten:
+            return p
+    return None
+
+
+def _them_cam_bien_wireguard(hass, entry, coordinator, async_add_entities) -> None:
+    """Mỗi peer WireGuard: tốc độ nhận/gửi (Mbit/s) và lần bắt tay gần nhất (giây trước). Mã thực thể theo quy ước card:
+    sensor.<tiền_tố>_wireguard_<peer>_(rx|tx|last_handshake)."""
+    da_them: set[str] = set()
+
+    @callback
+    def _them_moi() -> None:
+        moi: list[SensorEntity] = []
+        for p in (coordinator.data or {}).get("wireguard", []):
+            if p["name"] in da_them:
+                continue
+            da_them.add(p["name"])
+            moi += [WgTocDoSensor(coordinator, entry, p["name"], "rx"), WgTocDoSensor(coordinator, entry, p["name"], "tx"),
+                    WgBatTaySensor(coordinator, entry, p["name"])]
+        if moi:
+            async_add_entities(moi)
+
+    _them_moi()
+    entry.async_on_unload(coordinator.async_add_listener(_them_moi))
+
+
+class _Wg(CoordinatorEntity):
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator, entry: ConfigEntry, ten: str) -> None:
+        super().__init__(coordinator)
+        self._ten = ten
+        self._ma = f"{coordinator.tien_to}_wireguard_{slug(ten)}"
+        p = _peer_wg(coordinator, ten) or {}
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, f"{entry.entry_id}_wg_{slug(ten)}")}, name=f"WireGuard {p.get('comment') or ten}",
+                                            manufacturer="MikroTik", via_device=(DOMAIN, entry.entry_id))
+
+    @property
+    def available(self) -> bool:
+        return super().available and _peer_wg(self.coordinator, self._ten) is not None
+
+
+class WgTocDoSensor(_Wg, SensorEntity):
+    _attr_device_class = SensorDeviceClass.DATA_RATE
+    _attr_native_unit_of_measurement = UnitOfDataRate.MEGABITS_PER_SECOND
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator, entry, ten: str, huong: str) -> None:
+        super().__init__(coordinator, entry, ten)
+        self._huong = huong
+        self._attr_name = "RX" if huong == "rx" else "TX"       # card tách tên peer từ «WireGuard <peer> RX|TX»
+        self._attr_unique_id = f"{entry.entry_id}_wg_{slug(ten)}_{huong}"
+        self.entity_id = f"sensor.{self._ma}_{huong}"
+
+    @property
+    def native_value(self) -> float | None:
+        p = _peer_wg(self.coordinator, self._ten)
+        return p.get(f"{self._huong}_mbps") if p else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        p = _peer_wg(self.coordinator, self._ten) or {}
+        ra = {"interface": p.get("interface"), "allowed_address": p.get("allowed_address"), "endpoint": p.get("endpoint"), "comment": p.get("comment"),
+              "total_bytes": p.get(f"{self._huong}_bytes")}
+        return {k: v for k, v in ra.items() if v not in (None, "")}
+
+
+class WgBatTaySensor(_Wg, SensorEntity):
+    _attr_name = "Bắt tay gần nhất"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, entry, ten: str) -> None:
+        super().__init__(coordinator, entry, ten)
+        self._attr_unique_id = f"{entry.entry_id}_wg_{slug(ten)}_last_handshake"
+        self.entity_id = f"sensor.{self._ma}_last_handshake"
+
+    @property
+    def native_value(self) -> int | None:
+        p = _peer_wg(self.coordinator, self._ten)
+        return p.get("last_handshake_s") if p else None

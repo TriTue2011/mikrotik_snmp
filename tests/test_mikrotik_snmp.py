@@ -336,6 +336,18 @@ class CauTrucGopTest(unittest.TestCase):
                 if "LOGGER." in dong or "print(" in dong:
                     self.assertNotIn("mat_khau", dong)
 
+    def test_wireguard_theo_quy_uoc_ma_the_cua_card(self):
+        sensor = self._nguon("sensor.py")
+        self.assertIn('f"sensor.{self._ma}_{huong}"', sensor)
+        self.assertIn('f"{coordinator.tien_to}_wireguard_{slug(ten)}"', sensor)
+        self.assertIn('self.entity_id = f"sensor.{self._ma}_last_handshake"', sensor)
+        self.assertIn('f"binary_sensor.{coordinator.tien_to}_wireguard_{ma}_connected"', self._nguon("binary_sensor.py"))
+
+    def test_ten_wg_de_card_tach_ten_peer(self):
+        sensor = self._nguon("sensor.py")
+        self.assertIn('self._attr_name = "RX" if huong == "rx" else "TX"', sensor)
+        self.assertIn('name=f"WireGuard {p.get(\'comment\') or ten}"', sensor)
+
     def test_zte_la_tuy_chon(self):
         self.assertIn("co_zte", self._nguon("__init__.py"))
         self.assertIn("if coordinator.co_zte:", self._nguon("sensor.py"))
@@ -370,8 +382,9 @@ class ApiGia:
         self.so_lan = []
         self.kid = {"AA:BB:CC:DD:EE:01": {"bytes_down": 0, "bytes_up": 0, "rate_down": None, "rate_up": None}}
 
-    async def doc(self, lay_ten, lay_kid):
+    async def doc(self, lay_ten, lay_kid, lay_wg=False):
         self.so_lan.append((lay_ten, lay_kid))
+        self.wg = getattr(self, "wg", [{"name": "phone", "interface": "ether2", "rx_bytes": 0, "tx_bytes": 0, "last_handshake_s": 30, "disabled": False}])
         if self.loi:
             raise self.loi
         ra = {}
@@ -379,6 +392,8 @@ class ApiGia:
             ra["ten"] = {"AA:BB:CC:DD:EE:01": {"comment": "Máy in", "host_name": "hp"}}
         if lay_kid:
             ra["kid"] = self.kid
+        if lay_wg:
+            ra["wg"] = self.wg
         return ra
 
 
@@ -431,6 +446,25 @@ class GopApiTest(unittest.TestCase):
 
     def test_khong_khai_api_thi_api_none(self):
         self.assertIsNone(chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())["api"])
+
+
+class WireGuardThuThapTest(unittest.TestCase):
+    def test_peer_toc_do_ket_noi_va_danh_dau_giao_dien_wg(self):
+        r, a, dh = RouterGia(), ApiGia(), DongHo()
+        tt = ThuThap(r, None, dh, api=a)
+        chay(tt.cap_nhat())
+        dh.t += 5
+        a.wg = [{"name": "phone", "interface": "ether2", "rx_bytes": 6_250_000, "tx_bytes": 125_000, "last_handshake_s": 42, "disabled": False},
+                {"name": "cu", "interface": "ether2", "rx_bytes": 5, "tx_bytes": 5, "last_handshake_s": 9999, "disabled": False}]
+        d = chay(tt.cap_nhat())
+        ph = {p["name"]: p for p in d["wireguard"]}
+        self.assertEqual((ph["phone"]["rx_mbps"], ph["phone"]["tx_mbps"]), (10.0, 0.2))
+        self.assertTrue(ph["phone"]["connected"])
+        self.assertFalse(ph["cu"]["connected"])                         # bắt tay quá 3 phút → mất kết nối
+        self.assertEqual(d["interfaces"][3]["if_type"], "wg")           # ether2 có peer → nhận là giao diện wg (theo dữ liệu)
+
+    def test_khong_api_thi_khong_wireguard(self):
+        self.assertEqual(chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())["wireguard"], [])
 
 
 class NguonApiBaoVeTest(unittest.TestCase):

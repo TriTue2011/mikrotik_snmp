@@ -14,6 +14,7 @@ from typing import Any
 
 HET_GIO = 8.0
 _PROPLIST_LEASE = "mac-address,host-name,comment,address"
+_PROPLIST_WG = "name,interface,comment,allowed-address,current-endpoint-address,rx,tx,last-handshake,disabled"
 _PROPLIST_KID = "mac-address,ip-address,bytes-down,bytes-up,rate-down,rate-up"
 
 
@@ -200,4 +201,38 @@ def kid_control(p: Phien) -> dict[str, dict[str, int | None]]:
         if len(mac) == 17:
             ra[mac] = {"bytes_down": _so(d.get("bytes-down")), "bytes_up": _so(d.get("bytes-up")),
                        "rate_down": _bps(d.get("rate-down")), "rate_up": _bps(d.get("rate-up"))}
+    return ra
+
+
+_THOI_GIAN = re.compile(r"(\d+)\s*([wdhms])")
+_HE_GIAY = {"w": 604800, "d": 86400, "h": 3600, "m": 60, "s": 1}
+
+
+def thoi_gian_giay(v: Any) -> int | None:
+    """«1m33s», «00:01:33», «2h5m», «1w2d» → giây; rỗng, «never» hay lạ → None."""
+    chu = str(v if v is not None else "").strip().lower()
+    if not chu or chu == "never":
+        return None
+    m = re.fullmatch(r"(\d+):(\d{2}):(\d{2})", chu)
+    if m:
+        return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+    phan = _THOI_GIAN.findall(chu)
+    if not phan or "".join(f"{n}{u}" for n, u in phan) != chu.replace(" ", ""):
+        return None
+    return sum(int(n) * _HE_GIAY[u] for n, u in phan)
+
+
+def wireguard_peers(p: Phien) -> list[dict[str, Any]]:
+    """Các peer WireGuard: tên, giao diện, ghi chú, địa chỉ cho phép, địa chỉ đầu bên kia, byte nhận/gửi, lần bắt tay gần nhất (giây trước)."""
+    ra: list[dict[str, Any]] = []
+    for d in p.goi_doc("/interface/wireguard/peers/print", _PROPLIST_WG):
+        ten = str(d.get("name", "")).strip()[:40]
+        if not ten:
+            continue
+        ra.append({
+            "name": ten, "interface": str(d.get("interface", "")).strip()[:40], "comment": str(d.get("comment", "")).strip()[:40],
+            "allowed_address": str(d.get("allowed-address", "")).strip()[:80], "endpoint": str(d.get("current-endpoint-address", "")).strip()[:64],
+            "rx_bytes": _so(d.get("rx")), "tx_bytes": _so(d.get("tx")), "last_handshake_s": thoi_gian_giay(d.get("last-handshake")),
+            "disabled": str(d.get("disabled", "")).strip().lower() in ("true", "yes"),
+        })
     return ra

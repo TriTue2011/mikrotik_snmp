@@ -25,7 +25,7 @@ class MayKhach(Protocol):
 class NguonApi(Protocol):
     host: str
 
-    async def doc(self, lay_ten: bool, lay_kid: bool) -> dict[str, Any]: ...
+    async def doc(self, lay_ten: bool, lay_kid: bool, lay_wg: bool = False) -> dict[str, Any]: ...
 
 
 class NguonZte(Protocol):
@@ -56,6 +56,8 @@ class ThuThap:
         self._ten_mik: dict[str, dict[str, str]] = {}
         self._toc_do: dict[str, dict[str, float | None]] = {}
         self._truoc_kid: dict[str, tuple[float, int]] = {}
+        self._truoc_wg: dict[str, tuple[float, int]] = {}
+        self._wg: list[dict[str, Any]] = []
         self._trang_thai_api = "chua_doc" if api else None
         self._lan_zte = -1e18
         self._du_lieu_zte: dict[str, Any] | None = (
@@ -170,13 +172,15 @@ class ThuThap:
         """Tên máy (DHCP, mỗi CHU_KY_TEN_MIK_GIAY) và bộ đếm Kid Control (mỗi chu kỳ) qua API chỉ-đọc. Lỗi thì giữ kết quả cũ, ghi trạng thái."""
         lay_ten = t - self._lan_ten_mik >= CHU_KY_TEN_MIK_GIAY
         try:
-            d = await self._api.doc(lay_ten, True)
+            d = await self._api.doc(lay_ten, True, True)
         except Exception as loi:  # noqa: BLE001 - mất API chỉ làm mất tên/tốc độ từng máy, không hỏng phần SNMP
             self._trang_thai_api = _TRANG_THAI_LOI.get(type(loi).__name__, "loi")
             return
         if lay_ten and d.get("ten") is not None:
             self._ten_mik = d["ten"]
             self._lan_ten_mik = t
+        if d.get("wg") is not None:
+            self._wg = L.toc_do_wg(self._truoc_wg, d["wg"], t)
         kid = d.get("kid")
         if kid is None:
             self._trang_thai_api = "kid_control_khong_co"
@@ -206,9 +210,12 @@ class ThuThap:
             self._lan_zte = t
         if self._api is not None:
             await self._doc_api(t)
+        ten_wg = {p["interface"] for p in self._wg if p.get("interface")}
         ra: dict[int, dict[str, Any]] = {}
         for i in chi_so:
             g = dict(self.giao_dien[i])
+            if g["name"] in ten_wg:
+                g["if_type"] = "wg"          # nhận diện giao diện WireGuard theo dữ liệu (có peer), không theo tên
             for huong, goc in (("rx", L.IF_HC_IN), ("tx", L.IF_HC_OUT)):
                 so = L._so(v.get(f"{goc}.{i}"))
                 g[f"{huong}_mbps"] = None
@@ -223,4 +230,5 @@ class ThuThap:
                      self._ten_mik, self._toc_do)
         return {"interfaces": ra, "core": dict(self._loi_he_thong), "devices": dict(self._thiet_bi), "tree": cay,
                 "zte": dict(self._du_lieu_zte) if self._du_lieu_zte else None,
-                "api": {"trang_thai": self._trang_thai_api} if self._api is not None else None}
+                "api": {"trang_thai": self._trang_thai_api} if self._api is not None else None,
+                "wireguard": list(self._wg)}

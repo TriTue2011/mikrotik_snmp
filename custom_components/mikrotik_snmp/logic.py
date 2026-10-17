@@ -255,3 +255,24 @@ def phan_tich_ten_may(van_ban: Any) -> dict[str, str]:
         if mac and ten:
             ra[mac] = ten
     return ra
+
+
+def toc_do_tu_kid(truoc: dict[str, tuple[float, int]], kid: dict[str, dict[str, Any]], t: float) -> dict[str, dict[str, float | None]]:
+    """Tốc độ từng máy (Mbit/s) từ Kid Control. Ưu tiên bộ đếm byte (tự tính theo thời gian, như tốc độ cổng); chưa có lần đọc trước thì dùng
+    rate-down/up của router (bit/giây) nếu có. `truoc` được cập nhật tại chỗ: {«MAC|down»: (thời điểm, byte)}. Bộ đếm giảm (Kid Control đặt lại) → None."""
+    ra: dict[str, dict[str, float | None]] = {}
+    for mac, d in kid.items():
+        mot: dict[str, float | None] = {}
+        for huong, khoa_byte, khoa_rate in (("rx", "bytes_down", "rate_down"), ("tx", "bytes_up", "rate_up")):
+            so = _so(d.get(khoa_byte))
+            gia: float | None = None
+            if so is not None:
+                khoa = f"{mac}|{huong}"
+                gia = tinh_toc_do_mbit(truoc.get(khoa), (t, so))
+                truoc[khoa] = (t, so)
+            if gia is None:
+                rate = _so(d.get(khoa_rate))
+                gia = round(rate / 1_000_000, 3) if rate is not None and rate >= 0 else None
+            mot[f"{huong}_mbps"] = gia
+        ra[mac] = mot
+    return ra

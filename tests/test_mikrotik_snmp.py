@@ -317,6 +317,25 @@ class CauTrucGopTest(unittest.TestCase):
         self.assertIn('f"sensor.{coordinator.tien_to}_cay_thiet_bi"', sensor)
         self.assertIn("_unrecorded_attributes", sensor)           # thuộc tính lớn không ghi vào cơ sở dữ liệu lịch sử
 
+    def test_api_chi_doc_va_co_cam_bien_toc_do_tung_may(self):
+        init = self._nguon("__init__.py")
+        self.assertIn("co_api", init)
+        sensor = self._nguon("sensor.py")
+        self.assertIn("class CamBienTocDoMay", sensor)
+        self.assertIn("if coordinator.co_api:", sensor)
+        # máy khách API không có đường ghi: chỉ gọi goi_doc (print)
+        for ten in ("routeros_api.py", "nguon_api.py"):
+            nguon = self._nguon(ten)
+            for cam in ("/set", "/add", "/remove", "/reboot", "/make-static"):
+                self.assertNotIn(f'"{cam}', nguon.replace("không có /set", ""))
+        self.assertIn("chỉ cho phép lệnh đọc", self._nguon("routeros_api.py"))
+
+    def test_mat_khau_api_khong_vao_log(self):
+        for ten in ("routeros_api.py", "nguon_api.py", "config_flow.py"):
+            for dong in self._nguon(ten).splitlines():
+                if "LOGGER." in dong or "print(" in dong:
+                    self.assertNotIn("mat_khau", dong)
+
     def test_zte_la_tuy_chon(self):
         self.assertIn("co_zte", self._nguon("__init__.py"))
         self.assertIn("if coordinator.co_zte:", self._nguon("sensor.py"))
@@ -341,6 +360,100 @@ class CauTrucGopTest(unittest.TestCase):
             for dong in self._nguon(ten).splitlines():
                 if "LOGGER." in dong or "print(" in dong:
                     self.assertNotIn("mat_khau", dong)
+
+
+class ApiGia:
+    host = "172.16.10.1"
+
+    def __init__(self):
+        self.loi = None
+        self.so_lan = []
+        self.kid = {"AA:BB:CC:DD:EE:01": {"bytes_down": 0, "bytes_up": 0, "rate_down": None, "rate_up": None}}
+
+    async def doc(self, lay_ten, lay_kid):
+        self.so_lan.append((lay_ten, lay_kid))
+        if self.loi:
+            raise self.loi
+        ra = {}
+        if lay_ten:
+            ra["ten"] = {"AA:BB:CC:DD:EE:01": {"comment": "Máy in", "host_name": "hp"}}
+        if lay_kid:
+            ra["kid"] = self.kid
+        return ra
+
+
+class GopApiTest(unittest.TestCase):
+    def test_ten_va_toc_do_tung_may(self):
+        r, a, dh = RouterGia(), ApiGia(), DongHo()
+        r.db[f"{L.ARP_MAC}.6.172.16.10.50"] = "aabbccddee01"
+        tt = ThuThap(r, None, dh, api=a)
+        d1 = chay(tt.cap_nhat())
+        may = {c["mac"]: c for c in d1["tree"]["clients"]}["AA:BB:CC:DD:EE:01"]
+        self.assertEqual(may["name"], "Máy in")
+        self.assertIsNone(may["rx_mbps"])                       # lần đầu chưa có tốc độ
+        dh.t += 5
+        a.kid = {"AA:BB:CC:DD:EE:01": {"bytes_down": 6_250_000, "bytes_up": 0, "rate_down": None, "rate_up": None}}
+        d2 = chay(tt.cap_nhat())
+        may = {c["mac"]: c for c in d2["tree"]["clients"]}["AA:BB:CC:DD:EE:01"]
+        self.assertEqual((may["rx_mbps"], may["tx_mbps"]), (10.0, 0.0))
+        self.assertEqual(d2["api"]["trang_thai"], "ok")
+
+    def test_ten_chi_hoi_theo_chu_ky_con_kid_control_moi_lan(self):
+        r, a, dh = RouterGia(), ApiGia(), DongHo()
+        tt = ThuThap(r, None, dh, api=a)
+        chay(tt.cap_nhat())
+        dh.t += 5
+        chay(tt.cap_nhat())
+        dh.t += 70
+        chay(tt.cap_nhat())
+        self.assertEqual([x[0] for x in a.so_lan], [True, False, True])        # tên: lần đầu, rồi sau 60 giây
+        self.assertTrue(all(x[1] for x in a.so_lan))                            # Kid Control: mọi lần
+
+    def test_api_loi_giu_ten_cu_va_phan_snmp_van_chay(self):
+        class ApiLoiDangNhap(Exception):
+            pass
+        r, a, dh = RouterGia(), ApiGia(), DongHo()
+        r.db[f"{L.ARP_MAC}.6.172.16.10.50"] = "aabbccddee01"
+        tt = ThuThap(r, None, dh, api=a)
+        chay(tt.cap_nhat())
+        a.loi = ApiLoiDangNhap("sai")
+        dh.t += 70
+        d = chay(tt.cap_nhat())
+        self.assertEqual(d["api"]["trang_thai"], "loi_dang_nhap")
+        self.assertEqual({c["mac"]: c for c in d["tree"]["clients"]}["AA:BB:CC:DD:EE:01"]["name"], "Máy in")   # tên cũ còn
+        self.assertIn(3, d["interfaces"])
+
+    def test_kid_control_khong_co_chi_mat_toc_do_tung_may(self):
+        r, a, dh = RouterGia(), ApiGia(), DongHo()
+        a.kid = None
+        d = chay(ThuThap(r, None, dh, api=a).cap_nhat())
+        self.assertEqual(d["api"]["trang_thai"], "kid_control_khong_co")
+
+    def test_khong_khai_api_thi_api_none(self):
+        self.assertIsNone(chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())["api"])
+
+
+class NguonApiBaoVeTest(unittest.TestCase):
+    def test_nghi_sau_loi_dang_nhap_va_chi_goi_lenh_doc(self):
+        from mikrotik_snmp import nguon_api as N
+        from mikrotik_snmp.routeros_api import ApiLoiDangNhap
+        so = {"mo": 0}
+
+        def mo_gia(*a, **k):
+            so["mo"] += 1
+            raise ApiLoiDangNhap("sai")
+        N.mo_phien = mo_gia
+
+        async def chay_nen(f):
+            return f()
+        dh = DongHo()
+        n = N.NguonApi("172.16.10.1", 8729, "doc", "mk", "vt", chay_nen, dh)
+        with self.assertRaises(ApiLoiDangNhap):
+            chay(n.doc(True, True))
+        for _ in range(3):
+            with self.assertRaises(N.ApiTamNgung):
+                chay(n.doc(True, True))
+        self.assertEqual(so["mo"], 1)                                            # không gõ mật khẩu lại trong lúc nghỉ
 
 
 class CauTrucTest(unittest.TestCase):

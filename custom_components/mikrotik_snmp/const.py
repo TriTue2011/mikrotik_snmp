@@ -13,6 +13,12 @@ CONF_CHU_KY = "chu_ky"
 CONF_TIEN_TO = "tien_to"
 CONF_CONG = "cong"
 CONF_TEN_MAY = "ten_may"
+CONF_API_TEN = "api_ten"
+CONF_API_MAT_KHAU = "api_mat_khau"
+CONF_API_PORT = "api_port"
+CONF_API_VAN_TAY = "api_van_tay"
+API_PORT_MAC_DINH = 8729
+CHU_KY_TEN_MIK_GIAY = 60
 
 CONF_ZTE_HOST = "zte_host"
 CONF_ZTE_TEN = "zte_ten"

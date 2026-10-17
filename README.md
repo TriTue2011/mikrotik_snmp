@@ -46,6 +46,21 @@ Bước thứ hai của màn hình thêm tích hợp. Cần **tài khoản quả
 **không ghi gì**, mỗi lần đọc đăng nhập tối đa một lần, và sau một lần đăng nhập thất bại thì **nghỉ 30 phút** để không khoá tài khoản.
 Mật khẩu không vào log. Để trống IP để bỏ qua; khi ZTE lỗi, phần MikroTik vẫn chạy bình thường (trạng thái ở `sensor.<tiền_tố>_zte_trang_thai`).
 
+## Tên máy và tốc độ TỪNG máy: API chỉ-đọc (tuỳ chọn)
+SNMP không có tên máy và không có bộ đếm theo từng máy. Hai thứ này lấy qua **API RouterOS chỉ-đọc** (bước «API» khi thêm tích hợp, hoặc ⚙ Tuỳ chọn bước 3):
+- **Tên máy**: cột *Comment* (ghi chú) của lease DHCP mà anh đã đặt trên MikroTik; không có thì tên máy tự báo (`host-name`). Thứ tự ưu tiên tên:
+  tên tự đặt trong Tuỳ chọn > ghi chú DHCP > tên ZTE > `host-name`.
+- **Tốc độ từng máy** (rx = tải về máy, tx = tải lên): **Kid Control** (`/ip kid-control device`): tích hợp tự tính Mbit/s từ bộ đếm byte mỗi chu kỳ (hoặc dùng `rate-up/down` của router
+  ở lần đọc đầu). Cần Kid Control đã bật một lần trên router (`/ip kid-control add name=ca-nha mon=0s-1d tue=0s-1d wed=0s-1d thu=0s-1d fri=0s-1d sat=0s-1d sun=0s-1d`; không đặt giới hạn nên chỉ đo).
+
+Bảo mật: tài khoản **chỉ `api,read`** giới hạn theo IP Home Assistant:
+```
+/user group add name=ha-doc policy=api,read
+/user add name=ha-doc group=ha-doc address=<IP_HOME_ASSISTANT>/32 password=<MAT_KHAU>
+```
+Máy khách chỉ gửi lệnh `…/print` (mọi lệnh khác bị từ chối **trước khi gửi**, có test), nối qua TLS (cổng 8729) và **ghim vân tay SHA-256 của chứng chỉ** router
+(sai vân tay thì không đăng nhập, không gửi mật khẩu). Sau lỗi đăng nhập nghỉ 30 phút. Mật khẩu không vào log.
+
 ## Cài đặt
 1. HACS → Kho tuỳ chỉnh → `https://github.com/TriTue2011/mikrotik_snmp` → loại *Integration* → tải → khởi động lại Home Assistant.
 2. Cài đặt → Thiết bị & dịch vụ → Thêm tích hợp → **Mạng LAN: MikroTik (SNMP) + ZTE E2633**: nhập IP router, người dùng (`hass`), hai mật khẩu;

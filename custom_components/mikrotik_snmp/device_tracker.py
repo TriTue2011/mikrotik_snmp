@@ -118,4 +118,4 @@ class MayLan(CoordinatorEntity, ScannerEntity):
         may = self._may
         if not may:
             return {}
-        return {k: may[k] for k in ("parent", "interface", "source", "band", "rssi", "mode", "assoc_s") if may.get(k) not in (None, "")}
+        return {k: may[k] for k in ("parent", "interface", "source", "band", "rssi", "mode", "assoc_s", "rx_mbps", "tx_mbps") if may.get(k) not in (None, "")}

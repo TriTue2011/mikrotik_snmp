@@ -13,10 +13,12 @@ from . import logic as L
 from .const import (
     AUTH_MAC_DINH, AUTH_PROTOCOLS, CHU_KY_LON_NHAT, CHU_KY_MAC_DINH, CHU_KY_NHO_NHAT, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL,
     CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_TEN_MAY, CONF_PORT, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN,
+    CONF_API_MAT_KHAU, CONF_API_PORT, CONF_API_TEN, CONF_API_VAN_TAY, API_PORT_MAC_DINH,
     CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, PORT_MAC_DINH, PRIV_MAC_DINH, PRIV_PROTOCOLS, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoiDangNhap, SnmpLoiKetNoi
 from .thu_thap import LoiDuLieu, ThuThap
+from .routeros_api import ApiLoiDangNhap, ApiLoiKetNoi, ApiLoiVanTay, kid_control, lay_van_tay, mo_phien, ten_tu_dhcp
 from .zte_api import ZteE2633, ZteLoiDangNhap, ZteLoiKetNoi
 
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
@@ -54,6 +56,31 @@ async def _thu(hass, du: dict[str, Any]) -> list[str]:
         return sorted(g["name"] for g in tt.giao_dien.values())
     finally:
         mk.dong()
+
+
+def _thu_api(host: str, port: int, ten: str, mat_khau: str) -> str:
+    """Thử API chỉ-đọc (chạy trong luồng phụ): ghim vân tay chứng chỉ hiện tại, đăng nhập, đọc thử DHCP + Kid Control. Trả vân tay."""
+    van_tay = lay_van_tay(host, port)
+    p = mo_phien(host, port, ten, mat_khau, van_tay)
+    try:
+        ten_tu_dhcp(p)
+        try:
+            kid_control(p)
+        except Exception:  # noqa: BLE001 - Kid Control chưa bật: vẫn nhận (chỉ mất tốc độ từng máy)
+            pass
+    finally:
+        p.dong()
+    return van_tay
+
+
+def _loi_api(loi: Exception) -> str:
+    if isinstance(loi, ApiLoiDangNhap):
+        return "dang_nhap_api"
+    if isinstance(loi, ApiLoiVanTay):
+        return "van_tay_api"
+    if isinstance(loi, ApiLoiKetNoi):
+        return "ket_noi_api"
+    return "khong_ro"
 
 
 def _cong_schema(danh_sach: list[str], dang_chon: list[str]) -> vol.Schema:
@@ -105,7 +132,7 @@ class MikrotikSnmpConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = (user_input.get(CONF_ZTE_HOST) or "").strip()
             if not host:
-                return await self.async_step_cong()
+                return await self.async_step_api()
             if not HOST_RE.match(host):
                 loi["base"] = "host_sai"
             else:
@@ -123,13 +150,36 @@ class MikrotikSnmpConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._du.update({CONF_ZTE_HOST: host, CONF_ZTE_TEN: user_input.get(CONF_ZTE_TEN, ""),
                                      CONF_ZTE_MAT_KHAU: user_input.get(CONF_ZTE_MAT_KHAU, ""),
                                      CONF_ZTE_SSL: user_input.get(CONF_ZTE_SSL, False)})
-                    return await self.async_step_cong()
+                    return await self.async_step_api()
         mac_dinh = user_input or {}
         return self.async_show_form(step_id="zte", errors=loi, data_schema=vol.Schema({
             vol.Optional(CONF_ZTE_HOST, default=mac_dinh.get(CONF_ZTE_HOST, "")): str,
             vol.Optional(CONF_ZTE_TEN, default=mac_dinh.get(CONF_ZTE_TEN, "user")): str,
             vol.Optional(CONF_ZTE_MAT_KHAU, default=""): MAT_KHAU,
             vol.Optional(CONF_ZTE_SSL, default=mac_dinh.get(CONF_ZTE_SSL, False)): bool,
+        }))
+
+    async def async_step_api(self, user_input: dict[str, Any] | None = None):
+        """Bước tuỳ chọn: API RouterOS CHỈ ĐỌC để lấy TÊN máy (ghi chú DHCP) và TỐC ĐỘ từng máy (Kid Control). Bỏ trống tên đăng nhập để bỏ qua."""
+        loi: dict[str, str] = {}
+        if user_input is not None:
+            ten = (user_input.get(CONF_API_TEN) or "").strip()
+            if not ten:
+                return await self.async_step_cong()
+            port = user_input.get(CONF_API_PORT, API_PORT_MAC_DINH)
+            try:
+                van_tay = await self.hass.async_add_executor_job(_thu_api, self._du[CONF_HOST], port, ten, user_input.get(CONF_API_MAT_KHAU, ""))
+            except Exception as e:  # noqa: BLE001
+                loi["base"] = _loi_api(e)
+            else:
+                self._du.update({CONF_API_TEN: ten, CONF_API_MAT_KHAU: user_input.get(CONF_API_MAT_KHAU, ""), CONF_API_PORT: port,
+                                 CONF_API_VAN_TAY: van_tay})
+                return await self.async_step_cong()
+        mac_dinh = user_input or {}
+        return self.async_show_form(step_id="api", errors=loi, data_schema=vol.Schema({
+            vol.Optional(CONF_API_TEN, default=mac_dinh.get(CONF_API_TEN, "")): str,
+            vol.Optional(CONF_API_MAT_KHAU, default=""): MAT_KHAU,
+            vol.Optional(CONF_API_PORT, default=mac_dinh.get(CONF_API_PORT, API_PORT_MAC_DINH)): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
         }))
 
     async def async_step_cong(self, user_input: dict[str, Any] | None = None):
@@ -185,7 +235,8 @@ class MikrotikSnmpOptionsFlow(OptionsFlow):
         if user_input is not None:
             host = (user_input.get(CONF_ZTE_HOST) or "").strip()
             if not host:   # bỏ trống IP: tắt ZTE
-                return self.async_create_entry(data={**self._tuy_chon, CONF_ZTE_HOST: "", CONF_ZTE_TEN: "", CONF_ZTE_MAT_KHAU: ""})
+                self._tuy_chon = {**self._tuy_chon, CONF_ZTE_HOST: "", CONF_ZTE_TEN: "", CONF_ZTE_MAT_KHAU: ""}
+                return await self.async_step_api()
             mat_khau = user_input.get(CONF_ZTE_MAT_KHAU) or hien_tai.get(CONF_ZTE_MAT_KHAU, "")   # để trống = giữ mật khẩu cũ
             if not HOST_RE.match(host):
                 loi["base"] = "host_sai"
@@ -200,12 +251,38 @@ class MikrotikSnmpOptionsFlow(OptionsFlow):
                 except Exception:  # noqa: BLE001
                     loi["base"] = "khong_ro"
                 else:
-                    return self.async_create_entry(data={**self._tuy_chon, CONF_ZTE_HOST: host, CONF_ZTE_TEN: user_input.get(CONF_ZTE_TEN, ""),
-                                                         CONF_ZTE_MAT_KHAU: mat_khau, CONF_ZTE_SSL: user_input.get(CONF_ZTE_SSL, False)})
+                    self._tuy_chon = {**self._tuy_chon, CONF_ZTE_HOST: host, CONF_ZTE_TEN: user_input.get(CONF_ZTE_TEN, ""),
+                                      CONF_ZTE_MAT_KHAU: mat_khau, CONF_ZTE_SSL: user_input.get(CONF_ZTE_SSL, False)}
+                    return await self.async_step_api()
         mac_dinh = user_input or hien_tai
         return self.async_show_form(step_id="zte", errors=loi, data_schema=vol.Schema({
             vol.Optional(CONF_ZTE_HOST, default=mac_dinh.get(CONF_ZTE_HOST, "")): str,
             vol.Optional(CONF_ZTE_TEN, default=mac_dinh.get(CONF_ZTE_TEN, "user") or "user"): str,
             vol.Optional(CONF_ZTE_MAT_KHAU, default=""): MAT_KHAU,
             vol.Optional(CONF_ZTE_SSL, default=mac_dinh.get(CONF_ZTE_SSL, False)): bool,
+        }))
+
+    async def async_step_api(self, user_input: dict[str, Any] | None = None):
+        """Bước 3: API chỉ-đọc (tên máy từ ghi chú DHCP, tốc độ từng máy từ Kid Control). Mật khẩu trống = giữ cũ; tên đăng nhập trống = tắt.
+        Mỗi lần gửi đều ghim lại vân tay chứng chỉ hiện tại (dùng khi router đổi chứng chỉ)."""
+        hien_tai = {**self.config_entry.data, **self.config_entry.options}
+        loi: dict[str, str] = {}
+        if user_input is not None:
+            ten = (user_input.get(CONF_API_TEN) or "").strip()
+            if not ten:
+                return self.async_create_entry(data={**self._tuy_chon, CONF_API_TEN: "", CONF_API_MAT_KHAU: "", CONF_API_VAN_TAY: ""})
+            mat_khau = user_input.get(CONF_API_MAT_KHAU) or hien_tai.get(CONF_API_MAT_KHAU, "")
+            port = user_input.get(CONF_API_PORT, API_PORT_MAC_DINH)
+            try:
+                van_tay = await self.hass.async_add_executor_job(_thu_api, hien_tai[CONF_HOST], port, ten, mat_khau)
+            except Exception as e:  # noqa: BLE001
+                loi["base"] = _loi_api(e)
+            else:
+                return self.async_create_entry(data={**self._tuy_chon, CONF_API_TEN: ten, CONF_API_MAT_KHAU: mat_khau, CONF_API_PORT: port,
+                                                     CONF_API_VAN_TAY: van_tay})
+        mac_dinh = user_input or hien_tai
+        return self.async_show_form(step_id="api", errors=loi, data_schema=vol.Schema({
+            vol.Optional(CONF_API_TEN, default=mac_dinh.get(CONF_API_TEN, "")): str,
+            vol.Optional(CONF_API_MAT_KHAU, default=""): MAT_KHAU,
+            vol.Optional(CONF_API_PORT, default=mac_dinh.get(CONF_API_PORT, API_PORT_MAC_DINH)): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
         }))

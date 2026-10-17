@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     AUTH_MAC_DINH, CHU_KY_MAC_DINH, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL, CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_PORT,
+    CONF_API_MAT_KHAU, CONF_API_PORT, CONF_API_TEN, CONF_API_VAN_TAY, API_PORT_MAC_DINH,
     CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TEN_MAY, CONF_TIEN_TO, CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, DOMAIN,
     PORT_MAC_DINH, PRIV_MAC_DINH, TIEN_TO_MAC_DINH,
 )
@@ -21,6 +22,7 @@ from .thiet_bi import dinh_danh_cha
 from .logic import phan_tich_ten_may
 from .thu_thap import LoiDuLieu, ThuThap
 from .zte_api import ZteE2633
+from .nguon_api import NguonApi
 from .zte_nguon import NguonZte
 
 LOGGER = logging.getLogger(__name__)
@@ -48,7 +50,13 @@ class MikrotikSnmpCoordinator(DataUpdateCoordinator):
             zte = NguonZte(ZteE2633(cfg[CONF_ZTE_HOST], cfg.get(CONF_ZTE_TEN, ""), cfg.get(CONF_ZTE_MAT_KHAU, ""),
                                     xac_minh_ssl=cfg.get(CONF_ZTE_SSL, False)),
                            cfg[CONF_ZTE_HOST], hass.async_add_executor_job)
-        self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None, zte=zte, ten_may=phan_tich_ten_may(cfg.get(CONF_TEN_MAY, "")))
+        api = None
+        self.co_api = bool(cfg.get(CONF_API_TEN))
+        if self.co_api:
+            api = NguonApi(cfg[CONF_HOST], cfg.get(CONF_API_PORT, API_PORT_MAC_DINH), cfg[CONF_API_TEN], cfg.get(CONF_API_MAT_KHAU, ""),
+                           cfg.get(CONF_API_VAN_TAY, ""), hass.async_add_executor_job)
+        self._api = api
+        self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None, zte=zte, ten_may=phan_tich_ten_may(cfg.get(CONF_TEN_MAY, "")), api=api)
 
     async def _async_update_data(self):
         try:
@@ -99,4 +107,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator = hass.data[DOMAIN].pop(entry.entry_id, None)
         if coordinator is not None:
             coordinator.client.dong()
+            if coordinator._api is not None:
+                coordinator._api.dong()
     return ok

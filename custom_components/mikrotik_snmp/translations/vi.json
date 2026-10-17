@@ -39,6 +39,15 @@
           "zte_mat_khau": "Mật khẩu ZTE",
           "zte_xac_minh_ssl": "Kiểm chứng chứng chỉ HTTPS (thường tắt)"
         }
+      },
+      "api": {
+        "title": "API chỉ-đọc cho tên máy và tốc độ từng máy (tuỳ chọn)",
+        "description": "Lấy TÊN máy từ ghi chú (comment) của lease DHCP trên MikroTik và TỐC ĐỘ từng máy từ Kid Control. Dùng tài khoản chỉ có quyền api,read, giới hạn theo IP Home Assistant. Chỉ gửi lệnh đọc, nối TLS và ghim vân tay chứng chỉ. Để trống tên đăng nhập để bỏ qua.",
+        "data": {
+          "api_ten": "Tên đăng nhập API (chỉ đọc)",
+          "api_mat_khau": "Mật khẩu API",
+          "api_port": "Cổng API-SSL"
+        }
       }
     },
     "error": {
@@ -49,7 +58,10 @@
       "khong_ro": "Lỗi không rõ khi đọc SNMP. Xem Nhật ký Home Assistant (có thể thiếu thư viện pysnmp).",
       "dang_nhap_zte": "ZTE từ chối đăng nhập: kiểm tên và mật khẩu, và xem bộ phát có đang đăng nhập ở nơi khác không.",
       "ket_noi_zte": "Không tới được ZTE. Kiểm địa chỉ và mạng.",
-      "khong_co_cong": "Router trả lời nhưng không có danh sách cổng. Kiểm quyền SNMP (community chỉ-đọc) và địa chỉ."
+      "khong_co_cong": "Router trả lời nhưng không có danh sách cổng. Kiểm quyền SNMP (community chỉ-đọc) và địa chỉ.",
+      "dang_nhap_api": "Router từ chối tài khoản API: kiểm tên và mật khẩu (tài khoản nên chỉ có quyền api,read).",
+      "ket_noi_api": "Không tới được cổng API-SSL (8729). Kiểm /ip service api-ssl address và luật tường lửa cho IP Home Assistant.",
+      "van_tay_api": "Chứng chỉ của router khác vân tay đã ghim. Nếu bạn vừa đổi chứng chỉ thì gửi lại để ghim vân tay mới."
     },
     "abort": {
       "already_configured": "Router này đã được thêm.",
@@ -76,13 +88,25 @@
           "zte_mat_khau": "Mật khẩu ZTE (để trống = giữ cũ)",
           "zte_xac_minh_ssl": "Kiểm chứng chứng chỉ HTTPS (thường tắt)"
         }
+      },
+      "api": {
+        "title": "API chỉ-đọc cho tên máy và tốc độ từng máy (tuỳ chọn)",
+        "description": "Lấy TÊN máy từ ghi chú (comment) của lease DHCP trên MikroTik và TỐC ĐỘ từng máy từ Kid Control. Dùng tài khoản chỉ có quyền api,read, giới hạn theo IP Home Assistant. Chỉ gửi lệnh đọc, nối TLS và ghim vân tay chứng chỉ. Để trống tên đăng nhập để bỏ qua. Mật khẩu trống = giữ cũ.",
+        "data": {
+          "api_ten": "Tên đăng nhập API (chỉ đọc)",
+          "api_mat_khau": "Mật khẩu API",
+          "api_port": "Cổng API-SSL"
+        }
       }
     },
     "error": {
       "host_sai": "Địa chỉ chỉ được chứa chữ, số, dấu chấm và dấu gạch ngang.",
       "dang_nhap_zte": "ZTE từ chối đăng nhập: kiểm tên và mật khẩu, và xem bộ phát có đang đăng nhập ở nơi khác không.",
       "ket_noi_zte": "Không tới được ZTE. Kiểm địa chỉ và mạng.",
-      "khong_ro": "Lỗi không rõ khi đọc SNMP. Xem Nhật ký Home Assistant (có thể thiếu thư viện pysnmp)."
+      "khong_ro": "Lỗi không rõ khi đọc SNMP. Xem Nhật ký Home Assistant (có thể thiếu thư viện pysnmp).",
+      "dang_nhap_api": "Router từ chối tài khoản API: kiểm tên và mật khẩu (tài khoản nên chỉ có quyền api,read).",
+      "ket_noi_api": "Không tới được cổng API-SSL (8729). Kiểm /ip service api-ssl address và luật tường lửa cho IP Home Assistant.",
+      "van_tay_api": "Chứng chỉ của router khác vân tay đã ghim. Nếu bạn vừa đổi chứng chỉ thì gửi lại để ghim vân tay mới."
     }
   }
 }

@@ -5,6 +5,7 @@ Logic thuần, không phụ thuộc Home Assistant. Quy tắc:
 - MAC còn lại → là con của cổng nó được học trên bảng MAC; không biết cổng thì là con của router.
 - Nút ZTE là con của cổng mà ZTE cắm vào (suy từ IP của ZTE → MAC trong ARP → cổng trong bảng MAC); không suy được thì con của router.
 - ZTE không tự là «máy» của chính nó.
+Tên: tự đặt > ghi chú DHCP trên MikroTik > tên ZTE > host-name. Tốc độ từng máy (rx = tải về máy) lấy từ Kid Control nếu có.
 Dữ liệu từ router/ZTE là không tin được: đã được làm sạch ở lớp đọc (chuỗi cắt độ dài).
 """
 from __future__ import annotations
@@ -35,9 +36,12 @@ def _khoa_ip(ip: str):
 
 
 def xay_cay(giao_dien: dict[int, dict[str, Any]], bang_mac: dict[str, list[str]], arp: dict[str, str],
-            zte: dict[str, Any] | None, ten_router: str, ten_may: dict[str, str] | None = None) -> dict[str, Any]:
+            zte: dict[str, Any] | None, ten_router: str, ten_may: dict[str, str] | None = None,
+            ten_mik: dict[str, dict[str, str]] | None = None, toc_do: dict[str, dict[str, float | None]] | None = None) -> dict[str, Any]:
     cong_cua = _cong_cua(bang_mac)
     ten_may = {_hoa(m): t for m, t in (ten_may or {}).items()}
+    ten_mik = {_hoa(m): v for m, v in (ten_mik or {}).items()}
+    toc_do = {_hoa(m): v for m, v in (toc_do or {}).items()}
     arp = {_hoa(m): ip for m, ip in arp.items()}
     tim_mac_theo_ip = {ip: mac for mac, ip in arp.items()}
 
@@ -72,13 +76,19 @@ def xay_cay(giao_dien: dict[int, dict[str, Any]], bang_mac: dict[str, list[str]]
         if mac in zte_macs or (zte_ip and arp.get(mac) == zte_ip):
             continue
         w = zte_clients.get(mac)
+        mk = ten_mik.get(mac) or {}
+        td = toc_do.get(mac) or {}
         ip = arp.get(mac) or (w or {}).get("ip") or ""
         cong = cong_cua.get(mac, "")
         clients.append({
             "mac": mac, "ip": ip, "interface": cong,
             "parent": ZTE if w else (cong if cong in ten_cong else ROUTER),
             "wifi": bool(w), "source": "zte" if w else "mik",
-            "name": ten_may.get(mac) or (w or {}).get("name") or "",
+            # Tên: tự đặt > ghi chú DHCP trên MikroTik > tên ZTE > tên máy tự báo (host-name).
+            "name": ten_may.get(mac) or mk.get("comment") or (w or {}).get("name") or mk.get("host_name") or "",
+            "rx_mbps": td.get("rx_mbps"), "tx_mbps": td.get("tx_mbps"),
+            "rx_bps": None if td.get("rx_mbps") is None else round(td["rx_mbps"] * 1_000_000),
+            "tx_bps": None if td.get("tx_mbps") is None else round(td["tx_mbps"] * 1_000_000),
             "band": (w or {}).get("band"), "rssi": (w or {}).get("rssi"),
             "mode": (w or {}).get("mode"), "assoc_s": (w or {}).get("assoc_s"),
         })

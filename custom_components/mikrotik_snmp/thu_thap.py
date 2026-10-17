@@ -10,7 +10,7 @@ from typing import Any, Callable, Protocol
 
 from . import logic as L
 from .cay import xay_cay
-from .const import CHU_KY_CHAM_GIAY, CHU_KY_DO_LAI_GIAY, CHU_KY_THIET_BI_GIAY, CHU_KY_ZTE_GIAY, TOI_DA_OID_MOI_LAN
+from .const import CHU_KY_TEN_MIK_GIAY, CHU_KY_CHAM_GIAY, CHU_KY_DO_LAI_GIAY, CHU_KY_THIET_BI_GIAY, CHU_KY_ZTE_GIAY, TOI_DA_OID_MOI_LAN
 
 
 class LoiDuLieu(Exception):
@@ -22,18 +22,25 @@ class MayKhach(Protocol):
     async def walk(self, goc: str, hex_octet: bool = False) -> dict[str, Any]: ...
 
 
+class NguonApi(Protocol):
+    host: str
+
+    async def doc(self, lay_ten: bool, lay_kid: bool) -> dict[str, Any]: ...
+
+
 class NguonZte(Protocol):
     host: str
 
     async def doc(self) -> dict[str, Any]: ...
 
 
-_TRANG_THAI_LOI = {"ZteLoiDangNhap": "loi_dang_nhap", "ZteLoiKetNoi": "loi_ket_noi", "ZteTamNgung": "tam_ngung"}
+_TRANG_THAI_LOI = {"ZteLoiDangNhap": "loi_dang_nhap", "ZteLoiKetNoi": "loi_ket_noi", "ZteTamNgung": "tam_ngung", "ApiLoiDangNhap": "loi_dang_nhap",
+                   "ApiLoiVanTay": "loi_van_tay", "ApiLoiKetNoi": "loi_ket_noi", "ApiTamNgung": "tam_ngung"}
 
 
 class ThuThap:
     def __init__(self, may_khach: MayKhach, cong_chon: list[str] | None = None, dong_ho: Callable[[], float] = time.monotonic,
-                 zte: NguonZte | None = None, ten_may: dict[str, str] | None = None):
+                 zte: NguonZte | None = None, ten_may: dict[str, str] | None = None, api: NguonApi | None = None):
         self._mk = may_khach
         self._chon = set(cong_chon or [])      # rỗng = tất cả
         self._dong_ho = dong_ho
@@ -44,6 +51,12 @@ class ThuThap:
         self._lan_thiet_bi = -1e18
         self._zte = zte
         self._ten_may = dict(ten_may or {})
+        self._api = api
+        self._lan_ten_mik = -1e18
+        self._ten_mik: dict[str, dict[str, str]] = {}
+        self._toc_do: dict[str, dict[str, float | None]] = {}
+        self._truoc_kid: dict[str, tuple[float, int]] = {}
+        self._trang_thai_api = "chua_doc" if api else None
         self._lan_zte = -1e18
         self._du_lieu_zte: dict[str, Any] | None = (
             {"host": zte.host, "trang_thai": "chua_doc", "ap": {}, "clients": []} if zte else None)
@@ -153,6 +166,25 @@ class ThuThap:
         except Exception as loi:  # noqa: BLE001 - mọi lỗi nguồn ZTE chỉ làm mất thông tin WiFi, không làm hỏng phần MikroTik
             self._du_lieu_zte = {**cu, "host": self._zte.host, "trang_thai": _TRANG_THAI_LOI.get(type(loi).__name__, "loi")}
 
+    async def _doc_api(self, t: float) -> None:
+        """Tên máy (DHCP, mỗi CHU_KY_TEN_MIK_GIAY) và bộ đếm Kid Control (mỗi chu kỳ) qua API chỉ-đọc. Lỗi thì giữ kết quả cũ, ghi trạng thái."""
+        lay_ten = t - self._lan_ten_mik >= CHU_KY_TEN_MIK_GIAY
+        try:
+            d = await self._api.doc(lay_ten, True)
+        except Exception as loi:  # noqa: BLE001 - mất API chỉ làm mất tên/tốc độ từng máy, không hỏng phần SNMP
+            self._trang_thai_api = _TRANG_THAI_LOI.get(type(loi).__name__, "loi")
+            return
+        if lay_ten and d.get("ten") is not None:
+            self._ten_mik = d["ten"]
+            self._lan_ten_mik = t
+        kid = d.get("kid")
+        if kid is None:
+            self._trang_thai_api = "kid_control_khong_co"
+            self._toc_do = {}
+        else:
+            self._trang_thai_api = "ok"
+            self._toc_do = L.toc_do_tu_kid(self._truoc_kid, kid, t)
+
     async def cap_nhat(self) -> dict[str, Any]:
         bay_gio = self._dong_ho()
         if not self.giao_dien or bay_gio - self._lan_do >= CHU_KY_DO_LAI_GIAY:
@@ -172,6 +204,8 @@ class ThuThap:
         if self._zte is not None and t - self._lan_zte >= CHU_KY_ZTE_GIAY:
             await self._doc_zte()
             self._lan_zte = t
+        if self._api is not None:
+            await self._doc_api(t)
         ra: dict[int, dict[str, Any]] = {}
         for i in chi_so:
             g = dict(self.giao_dien[i])
@@ -185,6 +219,8 @@ class ThuThap:
             g.update(self._cham.get(i, {}))
             ra[i] = g
         ten_router = self._loi_he_thong.get("name") or "MikroTik"
-        cay = xay_cay(ra, self._thiet_bi["bang_mac"], self._thiet_bi["arp"], self._du_lieu_zte, ten_router, self._ten_may)
+        cay = xay_cay(ra, self._thiet_bi["bang_mac"], self._thiet_bi["arp"], self._du_lieu_zte, ten_router, self._ten_may,
+                     self._ten_mik, self._toc_do)
         return {"interfaces": ra, "core": dict(self._loi_he_thong), "devices": dict(self._thiet_bi), "tree": cay,
-                "zte": dict(self._du_lieu_zte) if self._du_lieu_zte else None}
+                "zte": dict(self._du_lieu_zte) if self._du_lieu_zte else None,
+                "api": {"trang_thai": self._trang_thai_api} if self._api is not None else None}

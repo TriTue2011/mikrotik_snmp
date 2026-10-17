@@ -64,6 +64,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                      ZteSoMaySensor(coordinator, entry, "5G"), ZteBoPhatSensor(coordinator, entry), ZteTrangThaiSensor(coordinator, entry)]
     async_add_entities(he_thong)
     _them_cam_bien_wifi(hass, entry, coordinator, async_add_entities)
+    if coordinator.co_api:
+        _them_cam_bien_toc_do_may(hass, entry, coordinator, async_add_entities)
+        async_add_entities([ApiTrangThaiSensor(coordinator, entry)])
 
 
 class _GiaoDien(CoordinatorEntity):
@@ -414,3 +417,94 @@ class ZteTrangThaiSensor(_ZteThietBi):
     @property
     def native_value(self) -> str | None:
         return self._zte.get("trang_thai")
+
+
+class ApiTrangThaiSensor(CoordinatorEntity, SensorEntity):
+    """Trạng thái đọc API chỉ-đọc: ok, kid_control_khong_co, loi_dang_nhap, loi_van_tay, loi_ket_noi, tam_ngung, loi."""
+
+    _attr_has_entity_name = True
+    _attr_name = "API trạng thái"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:api"
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_api_trang_thai"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self.entity_id = f"sensor.{coordinator.tien_to}_api_trang_thai"
+
+    @property
+    def native_value(self) -> str | None:
+        return ((self.coordinator.data or {}).get("api") or {}).get("trang_thai")
+
+
+def _may_cua(coordinator, mac: str) -> dict[str, Any] | None:
+    for may in ((coordinator.data or {}).get("tree") or {}).get("clients", []):
+        if may["mac"] == mac:
+            return may
+    return None
+
+
+def _them_cam_bien_toc_do_may(hass, entry, coordinator, async_add_entities) -> None:
+    """Tốc độ nhận (tải về) / gửi (tải lên) cho MỌI thiết bị, từ Kid Control. Máy lần đầu thấy hoặc đã từng thấy (sổ thực thể) thì dựng."""
+    da_them: set[tuple[str, str]] = set()
+    tien_to = f"{entry.entry_id}_"
+
+    def _dung(mac: str, huong: str):
+        if huong in ("rx", "tx") and (mac, huong) not in da_them:
+            da_them.add((mac, huong))
+            return CamBienTocDoMay(coordinator, entry, mac, huong)
+        return None
+
+    cu = []
+    for muc in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id):
+        if muc.domain == "sensor" and muc.unique_id.startswith(tien_to):
+            mac, _, huong = muc.unique_id.removeprefix(tien_to).partition("_")
+            if len(mac) == 17 and (cb := _dung(mac.upper(), huong)):
+                cu.append(cb)
+    if cu:
+        async_add_entities(cu)
+
+    @callback
+    def _them_moi() -> None:
+        moi = []
+        for may in ((coordinator.data or {}).get("tree") or {}).get("clients", []):
+            for huong in ("rx", "tx"):
+                if (cb := _dung(may["mac"], huong)):
+                    moi.append(cb)
+        if moi:
+            async_add_entities(moi)
+
+    _them_moi()
+    entry.async_on_unload(coordinator.async_add_listener(_them_moi))
+
+
+class CamBienTocDoMay(CoordinatorEntity, SensorEntity):
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.DATA_RATE
+    _attr_native_unit_of_measurement = UnitOfDataRate.MEGABITS_PER_SECOND
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator, entry: ConfigEntry, mac: str, huong: str) -> None:
+        super().__init__(coordinator)
+        self._mac, self._huong, self._entry_id = mac, huong, entry.entry_id
+        self._attr_name = "Tốc độ nhận (tải về)" if huong == "rx" else "Tốc độ gửi (tải lên)"
+        self._attr_unique_id = f"{entry.entry_id}_{mac}_{huong}"
+        self._attr_icon = "mdi:download-network" if huong == "rx" else "mdi:upload-network"
+        self._ten_cuoi = ten_thiet_bi(_may_cua(coordinator, mac), coordinator.data, mac)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        may = _may_cua(self.coordinator, self._mac) or {}
+        return DeviceInfo(connections={(CONNECTION_NETWORK_MAC, format_mac(self._mac))}, name=self._ten_cuoi,
+                          via_device=dinh_danh_cha(self._entry_id, may.get("parent"), self.coordinator.data))
+
+    @property
+    def available(self) -> bool:
+        return super().available and _may_cua(self.coordinator, self._mac) is not None
+
+    @property
+    def native_value(self) -> float | None:
+        may = _may_cua(self.coordinator, self._mac)
+        return may.get(f"{self._huong}_mbps") if may else None

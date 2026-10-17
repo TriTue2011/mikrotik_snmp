@@ -39,6 +39,15 @@
           "zte_mat_khau": "ZTE password",
           "zte_xac_minh_ssl": "Verify HTTPS certificate (usually off)"
         }
+      },
+      "api": {
+        "title": "Read-only API for names and per-device speed (optional)",
+        "description": "Gets NAMES from the DHCP lease comments on the MikroTik and per-device SPEED from Kid Control. Use an account with only api,read, limited to the Home Assistant IP. Only read commands are sent, over TLS with a pinned certificate fingerprint. Leave the username empty to skip.",
+        "data": {
+          "api_ten": "API username (read-only)",
+          "api_mat_khau": "API password",
+          "api_port": "API-SSL port"
+        }
       }
     },
     "error": {
@@ -49,7 +58,10 @@
       "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing).",
       "dang_nhap_zte": "The ZTE rejected the login: check username and password, and whether it is logged in elsewhere.",
       "ket_noi_zte": "Cannot reach the ZTE. Check the address and the network.",
-      "khong_co_cong": "The router answered but returned no port list. Check the SNMP (read-only) community and the address."
+      "khong_co_cong": "The router answered but returned no port list. Check the SNMP (read-only) community and the address.",
+      "dang_nhap_api": "The router rejected the API account: check the name and password (the account should only have api,read).",
+      "ket_noi_api": "Cannot reach the API-SSL port (8729). Check /ip service api-ssl address and the firewall rule for the Home Assistant IP.",
+      "van_tay_api": "The router certificate differs from the pinned fingerprint. If you just changed it, submit again to pin the new one."
     },
     "abort": {
       "already_configured": "This router is already added.",
@@ -76,13 +88,25 @@
           "zte_mat_khau": "ZTE password (empty = keep)",
           "zte_xac_minh_ssl": "Verify HTTPS certificate (usually off)"
         }
+      },
+      "api": {
+        "title": "Read-only API for names and per-device speed (optional)",
+        "description": "Gets NAMES from the DHCP lease comments on the MikroTik and per-device SPEED from Kid Control. Use an account with only api,read, limited to the Home Assistant IP. Only read commands are sent, over TLS with a pinned certificate fingerprint. Leave the username empty to skip. Empty password = keep the old one.",
+        "data": {
+          "api_ten": "API username (read-only)",
+          "api_mat_khau": "API password",
+          "api_port": "API-SSL port"
+        }
       }
     },
     "error": {
       "host_sai": "The address may only contain letters, digits, dots and hyphens.",
       "dang_nhap_zte": "The ZTE rejected the login: check username and password, and whether it is logged in elsewhere.",
       "ket_noi_zte": "Cannot reach the ZTE. Check the address and the network.",
-      "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing)."
+      "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing).",
+      "dang_nhap_api": "The router rejected the API account: check the name and password (the account should only have api,read).",
+      "ket_noi_api": "Cannot reach the API-SSL port (8729). Check /ip service api-ssl address and the firewall rule for the Home Assistant IP.",
+      "van_tay_api": "The router certificate differs from the pinned fingerprint. If you just changed it, submit again to pin the new one."
     }
   }
 }

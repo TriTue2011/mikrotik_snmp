@@ -142,3 +142,45 @@ class LoopbackTest(unittest.TestCase):
         mtu = {f"{L.IF_MTU}.1": 65536, f"{L.IF_MTU}.2": 1500}
         gd = L.phan_tich_giao_dien(ten, loai, mtu)
         self.assertEqual([g["name"] for g in gd.values()], ["ether1"])
+
+
+class TenMikTest(unittest.TestCase):
+    def test_thu_tu_uu_tien_ten(self):
+        """tên tự đặt > ghi chú DHCP trên MikroTik > tên ZTE > tên máy tự báo (host-name)."""
+        ten_mik = {
+            "AA:00:00:00:00:01": {"comment": "Máy in", "host_name": "HP123"},
+            "AA:00:00:00:00:03": {"comment": "", "host_name": "nas-host"},
+            "AA:00:00:00:00:11": {"comment": "Honor của Tuệ", "host_name": "HONOR"},
+            "AA:00:00:00:00:12": {"comment": "", "host_name": "galaxy-host"},
+        }
+        c = {m["mac"]: m for m in xay_cay(GIAO_DIEN, BANG_MAC, ARP, ZTE, "MikroTik", {"AA:00:00:00:00:01": "Tên tay"}, ten_mik)["clients"]}
+        self.assertEqual(c["AA:00:00:00:00:01"]["name"], "Tên tay")            # tự đặt thắng
+        self.assertEqual(c["AA:00:00:00:00:03"]["name"], "nas-host")           # chỉ có host-name
+        self.assertEqual(c["AA:00:00:00:00:11"]["name"], "Honor của Tuệ")      # ghi chú MikroTik thắng tên ZTE
+        self.assertEqual(c["AA:00:00:00:00:12"]["name"], "Galaxy")             # ZTE thắng host-name
+
+    def test_khong_co_nguon_ten_mik_thi_nhu_cu(self):
+        c = {m["mac"]: m for m in xay_cay(GIAO_DIEN, BANG_MAC, ARP, ZTE, "MikroTik")["clients"]}
+        self.assertEqual(c["AA:00:00:00:00:11"]["name"], "Honor")
+
+
+class TocDoKidTest(unittest.TestCase):
+    def test_toc_do_tu_byte_theo_thoi_gian_va_tu_rate_khi_chua_co_lan_truoc(self):
+        from mikrotik_snmp.logic import toc_do_tu_kid
+        truoc = {}
+        kid = {"AA:00:00:00:00:01": {"bytes_down": 0, "bytes_up": 0, "rate_down": 4_000_000, "rate_up": 1_000_000}}
+        d1 = toc_do_tu_kid(truoc, kid, 100.0)
+        self.assertEqual(d1["AA:00:00:00:00:01"], {"rx_mbps": 4.0, "tx_mbps": 1.0})       # lần đầu: dùng rate của router
+        kid2 = {"AA:00:00:00:00:01": {"bytes_down": 6_250_000, "bytes_up": 125_000, "rate_down": 0, "rate_up": 0}}
+        d2 = toc_do_tu_kid(truoc, kid2, 105.0)
+        self.assertEqual(d2["AA:00:00:00:00:01"], {"rx_mbps": 10.0, "tx_mbps": 0.2})     # 50 Mbit / 5 s; 1 Mbit / 5 s
+        kid3 = {"AA:00:00:00:00:01": {"bytes_down": 10, "bytes_up": 10, "rate_down": None, "rate_up": None}}
+        d3 = toc_do_tu_kid(truoc, kid3, 110.0)
+        self.assertEqual(d3["AA:00:00:00:00:01"], {"rx_mbps": None, "tx_mbps": None})     # bộ đếm đặt lại: không bịa số
+
+    def test_toc_do_vao_cay_cho_tung_may(self):
+        toc = {"AA:00:00:00:00:11": {"rx_mbps": 5.5, "tx_mbps": 0.5}}
+        c = {m["mac"]: m for m in xay_cay(GIAO_DIEN, BANG_MAC, ARP, ZTE, "MikroTik", None, None, toc)["clients"]}
+        self.assertEqual((c["AA:00:00:00:00:11"]["rx_mbps"], c["AA:00:00:00:00:11"]["tx_mbps"]), (5.5, 0.5))
+        self.assertEqual(c["AA:00:00:00:00:11"]["rx_bps"], 5_500_000)
+        self.assertIsNone(c["AA:00:00:00:00:01"]["rx_mbps"])                               # máy không có số đo: None, không phải 0

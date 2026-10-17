@@ -66,7 +66,23 @@
           "ten_may": "Device names (one per line: MAC = Name)"
         },
         "description": "Name devices by MAC, e.g. AA:BB:CC:DD:EE:01 = Printer. Lines starting with # are comments. These names win over names from the ZTE."
+      },
+      "zte": {
+        "title": "ZTE E2633 router",
+        "description": "Enter the ZTE IP and web admin account so WiFi clients appear as its children with name, band and signal. Empty password = keep the old one. Empty IP = disable the ZTE.",
+        "data": {
+          "zte_host": "ZTE IP address",
+          "zte_ten": "ZTE username",
+          "zte_mat_khau": "ZTE password (empty = keep)",
+          "zte_xac_minh_ssl": "Verify HTTPS certificate (usually off)"
+        }
       }
+    },
+    "error": {
+      "host_sai": "The address may only contain letters, digits, dots and hyphens.",
+      "dang_nhap_zte": "The ZTE rejected the login: check username and password, and whether it is logged in elsewhere.",
+      "ket_noi_zte": "Cannot reach the ZTE. Check the address and the network.",
+      "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing)."
     }
   }
 }

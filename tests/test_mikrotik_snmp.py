@@ -326,6 +326,16 @@ class CauTrucGopTest(unittest.TestCase):
         self.assertIn("via_device=self._cha", tracker)
         self.assertIn("dinh_danh_cha", tracker)
 
+    def test_tuy_chon_co_buoc_zte_de_them_sau(self):
+        """Thêm/đổi/tắt ZTE sau khi cài (không phải xoá rồi thêm lại): bước `zte` trong OptionsFlow, mật khẩu trống = giữ cũ."""
+        nguon = self._nguon("config_flow.py")
+        self.assertIn("async def async_step_zte", nguon[nguon.index("class MikrotikSnmpOptionsFlow"):])
+        self.assertIn('hien_tai.get(CONF_ZTE_MAT_KHAU, "")', nguon)
+        import json
+        vi = json.loads(self._nguon("translations/vi.json"))
+        self.assertIn("zte", vi["options"]["step"])
+        self.assertIn("dang_nhap_zte", vi["options"]["error"])
+
     def test_mat_khau_zte_khong_vao_log(self):
         for ten in ("zte_api.py", "zte_nguon.py", "config_flow.py", "__init__.py"):
             for dong in self._nguon(ten).splitlines():

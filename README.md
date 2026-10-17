@@ -50,8 +50,8 @@ Mật khẩu không vào log. Để trống IP để bỏ qua; khi ZTE lỗi, ph
 1. HACS → Kho tuỳ chỉnh → `https://github.com/TriTue2011/mikrotik_snmp` → loại *Integration* → tải → khởi động lại Home Assistant.
 2. Cài đặt → Thiết bị & dịch vụ → Thêm tích hợp → **Mạng LAN: MikroTik (SNMP) + ZTE E2633**: nhập IP router, người dùng (`hass`), hai mật khẩu;
    (tuỳ chọn) IP và tài khoản ZTE; rồi chọn cổng.
-3. Nút bánh răng: đổi chu kỳ đọc (mặc định 5 giây), cổng hiển thị, và **Tên thiết bị** (mỗi dòng `MAC = Tên`; SNMP không có tên máy nên anh tự đặt,
-   hoặc lấy tên từ ZTE cho máy WiFi). Tên thiết bị hiển thị dạng `ether3 · Máy in` nên danh sách thiết bị của Home Assistant xếp các máy cùng cổng liền nhau.
+3. Nút bánh răng, bước 1: đổi chu kỳ đọc (mặc định 5 giây), cổng hiển thị, và **Tên thiết bị** (mỗi dòng `MAC = Tên`; SNMP không có tên máy nên anh tự đặt,
+   hoặc lấy tên từ ZTE cho máy WiFi). Bước 2 của bánh răng là **ZTE**: thêm, đổi hoặc tắt ZTE sau khi đã cài (để trống mật khẩu = giữ mật khẩu cũ; để trống IP = tắt). Tên thiết bị hiển thị dạng `ether3 · Máy in` nên danh sách thiết bị của Home Assistant xếp các máy cùng cổng liền nhau.
 
 Cần thư viện `pysnmp`: Home Assistant đã có nếu từng dùng tích hợp «SNMP». Nếu thiếu, thêm một cảm biến SNMP bất kỳ một lần để Home Assistant cài nó.
 

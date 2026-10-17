@@ -66,7 +66,23 @@
           "ten_may": "Tên thiết bị (mỗi dòng: MAC = Tên)"
         },
         "description": "Đặt tên cho máy theo MAC, ví dụ: AA:BB:CC:DD:EE:01 = Máy in. Dòng bắt đầu bằng # là ghi chú. Tên này ưu tiên hơn tên từ ZTE."
+      },
+      "zte": {
+        "title": "Bộ phát ZTE E2633",
+        "description": "Nhập IP và tài khoản quản trị web của ZTE để máy WiFi hiện làm con của ZTE kèm tên, băng tần, tín hiệu. Để trống mật khẩu = giữ mật khẩu cũ. Để trống IP = tắt ZTE.",
+        "data": {
+          "zte_host": "Địa chỉ IP của ZTE",
+          "zte_ten": "Tên đăng nhập ZTE",
+          "zte_mat_khau": "Mật khẩu ZTE (để trống = giữ cũ)",
+          "zte_xac_minh_ssl": "Kiểm chứng chứng chỉ HTTPS (thường tắt)"
+        }
       }
+    },
+    "error": {
+      "host_sai": "Địa chỉ chỉ được chứa chữ, số, dấu chấm và dấu gạch ngang.",
+      "dang_nhap_zte": "ZTE từ chối đăng nhập: kiểm tên và mật khẩu, và xem bộ phát có đang đăng nhập ở nơi khác không.",
+      "ket_noi_zte": "Không tới được ZTE. Kiểm địa chỉ và mạng.",
+      "khong_ro": "Lỗi không rõ khi đọc SNMP. Xem Nhật ký Home Assistant (có thể thiếu thư viện pysnmp)."
     }
   }
 }

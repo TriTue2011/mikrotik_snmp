@@ -158,14 +158,18 @@ class MikrotikSnmpConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class MikrotikSnmpOptionsFlow(OptionsFlow):
-    """Nút bánh răng: đổi chu kỳ đọc và cổng hiển thị."""
+    """Nút bánh răng: bước 1 chu kỳ đọc, cổng, tên thiết bị; bước 2 bộ phát ZTE (thêm, đổi, hoặc bỏ trống IP để tắt)."""
+
+    def __init__(self) -> None:
+        self._tuy_chon: dict[str, Any] = {}
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         hien_tai = {**self.config_entry.data, **self.config_entry.options}
         coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
         ten_cong = sorted(g["name"] for g in coordinator.thu_thap.giao_dien.values()) if coordinator else hien_tai.get(CONF_CONG, [])
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            self._tuy_chon = user_input
+            return await self.async_step_zte()
         return self.async_show_form(step_id="init", data_schema=vol.Schema({
             vol.Required(CONF_CHU_KY, default=hien_tai.get(CONF_CHU_KY, CHU_KY_MAC_DINH)): vol.All(
                 vol.Coerce(int), vol.Range(min=CHU_KY_NHO_NHAT, max=CHU_KY_LON_NHAT)),
@@ -173,4 +177,35 @@ class MikrotikSnmpOptionsFlow(OptionsFlow):
                 selector.SelectSelectorConfig(options=ten_cong, multiple=True, mode=selector.SelectSelectorMode.DROPDOWN)),
             vol.Optional(CONF_TEN_MAY, default=hien_tai.get(CONF_TEN_MAY, "")): selector.TextSelector(
                 selector.TextSelectorConfig(multiline=True)),
+        }))
+
+    async def async_step_zte(self, user_input: dict[str, Any] | None = None):
+        hien_tai = {**self.config_entry.data, **self.config_entry.options}
+        loi: dict[str, str] = {}
+        if user_input is not None:
+            host = (user_input.get(CONF_ZTE_HOST) or "").strip()
+            if not host:   # bỏ trống IP: tắt ZTE
+                return self.async_create_entry(data={**self._tuy_chon, CONF_ZTE_HOST: "", CONF_ZTE_TEN: "", CONF_ZTE_MAT_KHAU: ""})
+            mat_khau = user_input.get(CONF_ZTE_MAT_KHAU) or hien_tai.get(CONF_ZTE_MAT_KHAU, "")   # để trống = giữ mật khẩu cũ
+            if not HOST_RE.match(host):
+                loi["base"] = "host_sai"
+            else:
+                may = ZteE2633(host, user_input.get(CONF_ZTE_TEN, ""), mat_khau, xac_minh_ssl=user_input.get(CONF_ZTE_SSL, False))
+                try:
+                    await self.hass.async_add_executor_job(may.doc_thiet_bi)
+                except ZteLoiDangNhap:
+                    loi["base"] = "dang_nhap_zte"
+                except ZteLoiKetNoi:
+                    loi["base"] = "ket_noi_zte"
+                except Exception:  # noqa: BLE001
+                    loi["base"] = "khong_ro"
+                else:
+                    return self.async_create_entry(data={**self._tuy_chon, CONF_ZTE_HOST: host, CONF_ZTE_TEN: user_input.get(CONF_ZTE_TEN, ""),
+                                                         CONF_ZTE_MAT_KHAU: mat_khau, CONF_ZTE_SSL: user_input.get(CONF_ZTE_SSL, False)})
+        mac_dinh = user_input or hien_tai
+        return self.async_show_form(step_id="zte", errors=loi, data_schema=vol.Schema({
+            vol.Optional(CONF_ZTE_HOST, default=mac_dinh.get(CONF_ZTE_HOST, "")): str,
+            vol.Optional(CONF_ZTE_TEN, default=mac_dinh.get(CONF_ZTE_TEN, "user") or "user"): str,
+            vol.Optional(CONF_ZTE_MAT_KHAU, default=""): MAT_KHAU,
+            vol.Optional(CONF_ZTE_SSL, default=mac_dinh.get(CONF_ZTE_SSL, False)): bool,
         }))

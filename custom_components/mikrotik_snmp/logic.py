@@ -31,6 +31,13 @@ HR_STORAGE_USED = "1.3.6.1.2.1.25.2.3.1.6"
 MTXR_VOLTAGE = "1.3.6.1.4.1.14988.1.1.3.8.0"       # 0,1 V
 MTXR_TEMPERATURE = "1.3.6.1.4.1.14988.1.1.3.10.0"  # 0,1 °C
 
+# BRIDGE-MIB (bảng MAC học được của bridge) và IP-MIB (bảng ARP)
+FDB_PORT = "1.3.6.1.2.1.17.4.3.1.2"        # chỉ số = 6 byte MAC dạng thập phân; giá trị = số cổng bridge
+FDB_STATUS = "1.3.6.1.2.1.17.4.3.1.3"      # 3 = học được, 4 = của chính router
+BASE_PORT_IF = "1.3.6.1.2.1.17.1.4.1.2"    # số cổng bridge → ifIndex
+ARP_MAC = "1.3.6.1.2.1.4.22.1.2"           # chỉ số = ifIndex.a.b.c.d; giá trị = MAC (octet)
+FDB_HOC_DUOC = 3
+
 IF_TYPE_BRIDGE = 209
 IF_TYPE_PPP = 23
 IF_TYPE_LOOPBACK = 24
@@ -163,3 +170,70 @@ def tim_chi_so_ram(mo_ta: dict[str, Any]) -> str | None:
 def phan_tram(dung: Any, tong: Any) -> float | None:
     d, t = _so(dung), _so(tong)
     return round(100 * d / t, 1) if d is not None and t and t > 0 else None
+
+
+_HEX = re.compile(r"^(?:0x)?([0-9a-fA-F]{12})$")
+
+
+def mac_tu_hex(chuoi: Any) -> str | None:
+    """«aabbccddeeff» hoặc «0xaabbccddeeff» → «AA:BB:CC:DD:EE:FF»; sai khuôn → None."""
+    m = _HEX.match(str(chuoi or "").strip())
+    if not m:
+        return None
+    h = m.group(1).upper()
+    return ":".join(h[i:i + 2] for i in range(0, 12, 2))
+
+
+def mac_tu_hau_to(hau: str) -> str | None:
+    """Chỉ số FDB «170.187.204.221.238.255» (6 byte thập phân) → «AA:BB:CC:DD:EE:FF»."""
+    phan = hau.split(".")
+    if len(phan) != 6 or not all(p.isdigit() and 0 <= int(p) <= 255 for p in phan):
+        return None
+    return ":".join(f"{int(p):02X}" for p in phan)
+
+
+def phan_tich_bang_mac(cong_fdb: dict[str, Any], trang_thai: dict[str, Any], co_so_if: dict[str, Any],
+                       giao_dien: dict[int, dict[str, Any]]) -> dict[str, list[str]]:
+    """Bảng MAC theo cổng: {tên cổng: [MAC…]}. Chỉ MAC «học được» (bỏ MAC của chính router), cổng không xác định thì bỏ."""
+    ra: dict[str, set[str]] = {}
+    for oid, so_cong in cong_fdb.items():
+        hau = hau_to(oid, FDB_PORT)
+        mac = mac_tu_hau_to(hau) if hau else None
+        if mac is None:
+            continue
+        tt = _so(trang_thai.get(f"{FDB_STATUS}.{hau}"))
+        if tt is not None and tt != FDB_HOC_DUOC:
+            continue
+        chi_so_if = _so(co_so_if.get(f"{BASE_PORT_IF}.{_so(so_cong)}"))
+        gd = giao_dien.get(chi_so_if) if chi_so_if is not None else None
+        if gd:
+            ra.setdefault(gd["name"], set()).add(mac)
+    return {k: sorted(v) for k, v in sorted(ra.items())}
+
+
+def phan_tich_arp(arp: dict[str, Any]) -> dict[str, str]:
+    """Bảng ARP: {MAC: IP}. Chỉ số «ifIndex.a.b.c.d»; MAC rỗng/sai khuôn bị bỏ."""
+    ra: dict[str, str] = {}
+    for oid, gia_tri in arp.items():
+        hau = hau_to(oid, ARP_MAC)
+        phan = hau.split(".") if hau else []
+        if len(phan) != 5 or not all(p.isdigit() and int(p) <= 255 for p in phan[1:]):
+            continue
+        mac = mac_tu_hex(gia_tri)
+        if mac and mac != "00:00:00:00:00:00":
+            ra[mac] = ".".join(phan[1:])
+    return ra
+
+
+def danh_sach_thiet_bi(arp: dict[str, str], bang_mac: dict[str, list[str]]) -> list[dict[str, str]]:
+    """Gộp ARP (IP) với bảng MAC (cổng): [{mac, ip, interface}], sắp theo IP. Máy chỉ có MAC (không ARP) vẫn có, ip rỗng."""
+    cong_cua: dict[str, str] = {}
+    for cong, ds in bang_mac.items():
+        for mac in ds:
+            cong_cua.setdefault(mac, cong)
+    mac_het = set(arp) | set(cong_cua)
+
+    def khoa(mac: str):
+        ip = arp.get(mac, "")
+        return (tuple(int(x) for x in ip.split(".")) if ip else (999,), mac)
+    return [{"mac": m, "ip": arp.get(m, ""), "interface": cong_cua.get(m, "")} for m in sorted(mac_het, key=khoa)]

@@ -22,6 +22,8 @@ AUTH_MAC_DINH = "hmac-sha"
 PRIV_MAC_DINH = "aes-cfb-128"
 # Thông tin chậm đổi (trạng thái, lỗi, nhiệt độ…) chỉ hỏi mỗi từng ấy giây; bộ đếm lưu lượng hỏi mỗi chu kỳ.
 CHU_KY_CHAM_GIAY = 30
+# Bảng ARP và bảng MAC (máy nào, IP nào, cổng nào) đọc mỗi từng ấy giây.
+CHU_KY_THIET_BI_GIAY = 15
 # Danh sách giao diện chỉ dò lại sau từng ấy giây (giao diện mới xuất hiện).
 CHU_KY_DO_LAI_GIAY = 600
 # Mỗi lần hỏi chỉ gửi từng ấy OID để không vượt kích thước gói SNMP.

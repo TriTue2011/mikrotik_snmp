@@ -35,6 +35,20 @@ class RouterGia:
             self.db[f"{L.IF_HIGH_SPEED}.{i}"] = 1000
             self.db[f"{L.IF_HC_IN}.{i}"] = 1_000_000
             self.db[f"{L.IF_HC_OUT}.{i}"] = 2_000_000
+        # BRIDGE-MIB: cổng bridge 1 → ifIndex 3 (ether2), cổng 2 → ifIndex 2 (WAN); ARP cho 2 máy
+        self.db[f"{L.BASE_PORT_IF}.1"] = 3
+        self.db[f"{L.BASE_PORT_IF}.2"] = 2
+        self.db[f"{L.FDB_PORT}.170.187.204.221.238.1"] = 1
+        self.db[f"{L.FDB_STATUS}.170.187.204.221.238.1"] = 3
+        self.db[f"{L.FDB_PORT}.170.187.204.221.238.2"] = 1
+        self.db[f"{L.FDB_STATUS}.170.187.204.221.238.2"] = 3
+        self.db[f"{L.FDB_PORT}.1.2.3.4.5.6"] = 2          # máy sau WAN
+        self.db[f"{L.FDB_STATUS}.1.2.3.4.5.6"] = 3
+        self.db[f"{L.FDB_PORT}.9.9.9.9.9.9"] = 1          # MAC của chính router: bị bỏ
+        self.db[f"{L.FDB_STATUS}.9.9.9.9.9.9"] = 4
+        self.db[f"{L.ARP_MAC}.6.172.16.10.50"] = "aabbccddee01"
+        self.db[f"{L.ARP_MAC}.6.172.16.10.9"] = "aabbccddee02"
+        self.db[f"{L.ARP_MAC}.6.172.16.10.77"] = "000000000000"   # ARP chưa phân giải: bị bỏ
         self.so_lan_get = 0
         self.oid_moi_lan: list[int] = []
 
@@ -43,7 +57,7 @@ class RouterGia:
         self.oid_moi_lan.append(len(oids))
         return {o: self.db[o] for o in oids if o in self.db}
 
-    async def walk(self, goc):
+    async def walk(self, goc, hex_octet=False):
         return {o: v for o, v in self.db.items() if o.startswith(goc + ".")}
 
 
@@ -160,6 +174,54 @@ class ThuThapTest(unittest.TestCase):
         ten = {f"{L.IF_NAME}.5": "ether-1", f"{L.IF_NAME}.7": "ether_1"}
         gd = L.phan_tich_giao_dien(ten, {})
         self.assertEqual(len({g["slug"] for g in gd.values()}), 2)
+
+
+class ThietBiLanTest(unittest.TestCase):
+    def test_mac_tu_hex_va_hau_to(self):
+        self.assertEqual(L.mac_tu_hex("aabbccddee01"), "AA:BB:CC:DD:EE:01")
+        self.assertEqual(L.mac_tu_hex("0xaabbccddee01"), "AA:BB:CC:DD:EE:01")
+        self.assertIsNone(L.mac_tu_hex("khong-phai-mac"))
+        self.assertEqual(L.mac_tu_hau_to("170.187.204.221.238.1"), "AA:BB:CC:DD:EE:01")
+        self.assertIsNone(L.mac_tu_hau_to("1.2.3"))
+        self.assertIsNone(L.mac_tu_hau_to("300.1.1.1.1.1"))
+
+    def test_bang_mac_theo_cong_bo_mac_cua_router(self):
+        d = chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())["devices"]
+        self.assertEqual(d["bang_mac"], {"WAN-ETHER1": ["01:02:03:04:05:06"], "ether2": ["AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"]})
+        self.assertNotIn("09:09:09:09:09:09", [m for ds in d["bang_mac"].values() for m in ds])
+
+    def test_arp_va_danh_sach_thiet_bi(self):
+        d = chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())["devices"]
+        self.assertEqual(d["arp"], {"AA:BB:CC:DD:EE:01": "172.16.10.50", "AA:BB:CC:DD:EE:02": "172.16.10.9"})
+        ds = d["clients"]
+        # sắp theo IP; máy chỉ có trong bảng MAC (không ARP) vẫn có, ip rỗng, xếp cuối
+        self.assertEqual([c["ip"] for c in ds], ["172.16.10.9", "172.16.10.50", ""])
+        self.assertEqual(ds[0], {"mac": "AA:BB:CC:DD:EE:02", "ip": "172.16.10.9", "interface": "ether2"})
+        self.assertEqual(ds[2]["interface"], "WAN-ETHER1")
+
+    def test_router_khong_co_bang_mac_khong_vo(self):
+        r = RouterGia()
+        for k in [k for k in r.db if k.startswith(L.FDB_PORT) or k.startswith(L.ARP_MAC)]:
+            del r.db[k]
+        d = chay(ThuThap(r, None, DongHo()).cap_nhat())
+        self.assertEqual(d["devices"]["clients"], [])
+        self.assertFalse(d["devices"]["co_bang_mac"])
+        self.assertIn(3, d["interfaces"])      # phần tốc độ cổng vẫn chạy
+
+    def test_loi_khi_doc_bang_giu_ket_qua_cu(self):
+        r, dh = RouterGia(), DongHo()
+        tt = ThuThap(r, None, dh)
+        chay(tt.cap_nhat())
+        goc_walk = r.walk
+
+        async def hong(goc, hex_octet=False):
+            if goc in (L.FDB_PORT, L.ARP_MAC):
+                raise RuntimeError("router khong tra loi")
+            return await goc_walk(goc, hex_octet)
+        r.walk = hong
+        dh.t += 20
+        d = chay(tt.cap_nhat())
+        self.assertEqual(len(d["devices"]["clients"]), 3)      # giữ danh sách cũ, không mất thiết bị
 
 
 class CauTrucTest(unittest.TestCase):

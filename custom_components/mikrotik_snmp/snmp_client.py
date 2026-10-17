@@ -33,9 +33,11 @@ def _phan_loai(loi: Any) -> SnmpLoi:
     return SnmpLoiDangNhap(str(loi)[:120])
 
 
-def _gia_tri(v: Any) -> Any:
+def _gia_tri(v: Any, hex_octet: bool = False) -> Any:
     if type(v).__name__ in ("NoSuchObject", "NoSuchInstance", "EndOfMibView"):
         return None
+    if hex_octet and hasattr(v, "asOctets"):
+        return v.asOctets().hex()      # MAC: luôn dạng hex, không bị hiểu nhầm thành chữ
     try:
         return int(v)
     except (TypeError, ValueError):
@@ -89,7 +91,7 @@ class SnmpClient:
                 ra[str(ten.prettyPrint() if hasattr(ten, "prettyPrint") else ten).lstrip(".")] = v
         return ra
 
-    async def walk(self, goc: str) -> dict[str, Any]:
+    async def walk(self, goc: str, hex_octet: bool = False) -> dict[str, Any]:
         """Duyệt cây con bằng GETNEXT lặp (có giới hạn bước)."""
         h, du, muc_tieu = await self._chuan_bi()
         ra: dict[str, Any] = {}
@@ -105,7 +107,7 @@ class SnmpClient:
             oid = str(ten.prettyPrint() if hasattr(ten, "prettyPrint") else ten).lstrip(".")
             if hau_to(oid, goc) is None:
                 break
-            v = _gia_tri(gia_tri)
+            v = _gia_tri(gia_tri, hex_octet)
             if v is None:
                 break
             ra[oid] = v

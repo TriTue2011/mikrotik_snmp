@@ -56,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if core.get("voltage") is not None:
         he_thong.append(HeThongSensor(coordinator, entry, "voltage", "Điện áp", "voltage", UnitOfElectricPotential.VOLT,
                                          SensorDeviceClass.VOLTAGE, None))
+    he_thong += [BangMacSensor(coordinator, entry), ThietBiLanSensor(coordinator, entry)]
     async_add_entities(he_thong)
 
 
@@ -168,3 +169,49 @@ class HeThongSensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         core = (self.coordinator.data or {}).get("core", {})
         return {k: core[k] for k in ("descr", "name") if core.get(k)} if self._khoa == "uptime" else {}
+
+
+class BangMacSensor(CoordinatorEntity, SensorEntity):
+    """Bảng MAC theo cổng cho `mac_sensor` của card: trạng thái là tổng số MAC, thuộc tính là {tên cổng: [MAC…]}."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Bảng MAC"
+    _attr_icon = "mdi:table-network"
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_bang_mac"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self.entity_id = f"sensor.{coordinator.tien_to}_bang_mac"
+
+    @property
+    def native_value(self) -> int | None:
+        dev = (self.coordinator.data or {}).get("devices", {})
+        return sum(len(v) for v in dev.get("bang_mac", {}).values()) if dev.get("co_bang_mac") else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return dict((self.coordinator.data or {}).get("devices", {}).get("bang_mac", {}))
+
+
+class ThietBiLanSensor(CoordinatorEntity, SensorEntity):
+    """Danh sách thiết bị trong LAN (thuộc tính `clients`: mac, ip, interface) cho `sources` của card."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Thiết bị trong LAN"
+    _attr_icon = "mdi:lan"
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_thiet_bi_lan"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self.entity_id = f"sensor.{coordinator.tien_to}_thiet_bi_lan"
+
+    @property
+    def native_value(self) -> int | None:
+        dev = (self.coordinator.data or {}).get("devices")
+        return len(dev["clients"]) if dev else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"clients": list((self.coordinator.data or {}).get("devices", {}).get("clients", []))}

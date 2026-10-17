@@ -9,12 +9,12 @@ import time
 from typing import Any, Callable, Protocol
 
 from . import logic as L
-from .const import CHU_KY_CHAM_GIAY, CHU_KY_DO_LAI_GIAY, TOI_DA_OID_MOI_LAN
+from .const import CHU_KY_CHAM_GIAY, CHU_KY_DO_LAI_GIAY, CHU_KY_THIET_BI_GIAY, TOI_DA_OID_MOI_LAN
 
 
 class MayKhach(Protocol):
     async def get(self, oids: list[str]) -> dict[str, Any]: ...
-    async def walk(self, goc: str) -> dict[str, Any]: ...
+    async def walk(self, goc: str, hex_octet: bool = False) -> dict[str, Any]: ...
 
 
 class ThuThap:
@@ -26,6 +26,8 @@ class ThuThap:
         self._chi_so_ram: str | None = None
         self._lan_do = -1e18
         self._lan_cham = -1e18
+        self._lan_thiet_bi = -1e18
+        self._thiet_bi: dict[str, Any] = {"bang_mac": {}, "arp": {}, "clients": [], "co_bang_mac": False}
         self._truoc: dict[tuple[int, str], tuple[float, int]] = {}
         self._cham: dict[int, dict[str, Any]] = {}
         self._loi_he_thong: dict[str, Any] = {}
@@ -99,6 +101,23 @@ class ThuThap:
             "memory": ram,
         }
 
+    async def _doc_thiet_bi(self) -> None:
+        """Bảng ARP + bảng MAC của bridge. Router không có bảng nào thì giữ kết quả cũ (không làm hỏng cả lần cập nhật)."""
+        try:
+            arp = L.phan_tich_arp(await self._mk.walk(L.ARP_MAC, hex_octet=True))
+        except Exception:  # noqa: BLE001
+            arp = self._thiet_bi["arp"]
+        try:
+            cong = await self._mk.walk(L.FDB_PORT)
+            if cong:
+                bang = L.phan_tich_bang_mac(cong, await self._mk.walk(L.FDB_STATUS),
+                                            await self._mk.walk(L.BASE_PORT_IF), self.giao_dien)
+            else:
+                bang = {}
+        except Exception:  # noqa: BLE001
+            bang = self._thiet_bi["bang_mac"]
+        self._thiet_bi = {"bang_mac": bang, "arp": arp, "clients": L.danh_sach_thiet_bi(arp, bang), "co_bang_mac": bool(bang)}
+
     async def cap_nhat(self) -> dict[str, Any]:
         bay_gio = self._dong_ho()
         if not self.giao_dien or bay_gio - self._lan_do >= CHU_KY_DO_LAI_GIAY:
@@ -112,6 +131,9 @@ class ThuThap:
         if t - self._lan_cham >= CHU_KY_CHAM_GIAY or not self._cham:
             await self._doc_cham(chi_so)
             self._lan_cham = t
+        if t - self._lan_thiet_bi >= CHU_KY_THIET_BI_GIAY:
+            await self._doc_thiet_bi()
+            self._lan_thiet_bi = t
         ra: dict[int, dict[str, Any]] = {}
         for i in chi_so:
             g = dict(self.giao_dien[i])
@@ -124,4 +146,4 @@ class ThuThap:
                     self._truoc[(i, huong)] = (t, so)
             g.update(self._cham.get(i, {}))
             ra[i] = g
-        return {"interfaces": ra, "core": dict(self._loi_he_thong)}
+        return {"interfaces": ra, "core": dict(self._loi_he_thong), "devices": dict(self._thiet_bi)}

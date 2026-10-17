@@ -13,6 +13,7 @@ không cần cấu hình thêm khi tiền tố là `mikrotik_router`.
 | Tốc độ từng cổng, tổng byte, lỗi, trạng thái link | Tốc độ **từng máy** (kid-control/accounting) |
 | CPU, RAM, thời gian chạy, nhiệt độ, điện áp | Tên máy từ DHCP (chỉ có qua API) |
 | Cổng ảo (bridge, PPPoE) | Chi tiết WireGuard (peer, handshake) |
+| **Máy nào, IP nào, cắm cổng nào** (ARP + bảng MAC của bridge, 15 giây/lần) | |
 | | Công tắc bật/tắt cổng, luật tường lửa, nút khởi động lại, cập nhật |
 
 ## Thiết lập router (RouterOS 7), SNMPv3 chỉ đọc, chỉ cho máy Home Assistant
@@ -36,16 +37,28 @@ Không dùng nháy kép cong `“ ”` (bàn phím điện thoại hay tự đ�
 
 Cần thư viện `pysnmp`: Home Assistant đã có nếu từng dùng tích hợp «SNMP». Thiếu thì thêm một cảm biến SNMP bất kỳ một lần để Home Assistant cài nó.
 
+## Dùng với card (không cần tích hợp MikroTik cũ)
+```yaml
+type: custom:mikrotik-topo-lan-card
+prefix: mikrotik_router          # trùng «Tiền tố» khi thêm tích hợp
+mac_sensor: sensor.mikrotik_router_bang_mac      # card tự biết máy nào sau cổng nào (switch SW1/SW2…)
+sources:
+  - node: LAN                    # tên không trùng hộp nào: thiết bị vào LAN, rồi được xếp theo cổng
+    entity: sensor.mikrotik_router_thiet_bi_lan
+    attribute: clients
+```
+Tên máy không có trong SNMP: dùng `device_names` (theo MAC) của card, hoặc tên từ cảm biến ZTE.
+
 ## Thực thể
 Với mỗi cổng (`<loại>` là `port`, `bridge` hoặc `ppp`; `<cổng>` là tên cổng viết thường, ví dụ `ether2`, `bridgelan`):
 `sensor.<tiền_tố>_<loại>_<cổng>_rx|tx` (Mbit/s), `…_rx_total|tx_total` (byte), `…_in_errors|out_errors`,
-`binary_sensor.<tiền_tố>_<loại>_<cổng>_connection`. Của router: `sensor.<tiền_tố>_core_cpu_load|memory_usage|uptime|temperature|voltage`.
+`binary_sensor.<tiền_tố>_<loại>_<cổng>_connection`. Của router: `sensor.<tiền_tố>_core_cpu_load|memory_usage|uptime|temperature|voltage`, `sensor.<tiền_tố>_bang_mac` (thuộc tính `{cổng: [MAC…]}` cho `mac_sensor` của card), `sensor.<tiền_tố>_thiet_bi_lan` (thuộc tính `clients`: `mac`, `ip`, `interface`).
 Nếu tích hợp MikroTik cũ còn cài, mã thực thể trùng nhau và Home Assistant thêm đuôi `_2`: gỡ tích hợp cũ trước, hoặc đặt tiền tố khác.
 
 ## Trạng thái kiểm chứng (nói thật)
 - Logic (tính tốc độ từ bộ đếm 64-bit, tràn bộ đếm, router khởi động lại, phân tích bảng giao diện, chia nhóm OID) kiểm bằng **router giả**:
   `python3 -m unittest discover -s tests -p "test_*.py"`.
-- Phần gọi `pysnmp` (GET đã chạy được trong container Home Assistant; GETNEXT để duyệt bảng **chưa kiểm trên router thật**) và phần giao diện Home Assistant
+- Phần gọi `pysnmp` (GET đã chạy được trong container Home Assistant; GETNEXT để duyệt bảng và OID bảng ARP/bảng MAC của bridge **chưa kiểm trên router thật**) và phần giao diện Home Assistant
   (màn hình cấu hình, thực thể) **chưa chạy thử trong Home Assistant thật**.
 - OID nhiệt độ/điện áp (`MIKROTIK-MIB`) và RAM (`hrStorage`) có thể khác theo bo mạch: thiếu thì cảm biến bị bỏ, không báo lỗi.
 

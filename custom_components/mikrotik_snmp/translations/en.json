@@ -29,6 +29,16 @@
           "auth_key": "Authentication password",
           "priv_key": "Encryption password"
         }
+      },
+      "zte": {
+        "title": "ZTE E2633 router (optional)",
+        "description": "If you have a ZTE E2633, add it so WiFi clients appear as its children with signal, band and mode. Leave the address empty to skip. This is the ZTE web admin account (read-only use).",
+        "data": {
+          "zte_host": "ZTE IP address",
+          "zte_ten": "ZTE username",
+          "zte_mat_khau": "ZTE password",
+          "zte_xac_minh_ssl": "Verify HTTPS certificate (usually off)"
+        }
       }
     },
     "error": {
@@ -36,7 +46,9 @@
       "tien_to_sai": "The prefix may only contain lowercase letters, digits and underscores.",
       "dang_nhap": "The router rejected the login: check the username, both passwords and protocols (SHA auth, AES encryption).",
       "ket_noi": "Cannot reach the router (timeout). Check the address, port 161 and the firewall.",
-      "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing)."
+      "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing).",
+      "dang_nhap_zte": "The ZTE rejected the login: check username and password, and whether it is logged in elsewhere.",
+      "ket_noi_zte": "Cannot reach the ZTE. Check the address and the network."
     },
     "abort": {
       "already_configured": "This router is already added.",

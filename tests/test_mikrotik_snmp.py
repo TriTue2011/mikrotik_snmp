@@ -224,6 +224,115 @@ class ThietBiLanTest(unittest.TestCase):
         self.assertEqual(len(d["devices"]["clients"]), 3)      # giữ danh sách cũ, không mất thiết bị
 
 
+class ZteGia:
+    host = "172.16.10.24"
+
+    def __init__(self):
+        self.loi: Exception | None = None
+        self.so_lan = 0
+
+    async def doc(self):
+        self.so_lan += 1
+        if self.loi:
+            raise self.loi
+        return {"ap": {"mac": "02:11:22:33:44:55", "ip": "172.16.10.24", "name": "ZTE:ZXHN E2633", "firmware": "V1.0.4"},
+                "clients": [{"mac": "aa:bb:cc:dd:ee:01", "ip": "172.16.10.50", "name": "Honor", "band": "5G", "rssi": -58,
+                             "mode": "802.11ax", "assoc_s": 100}]}
+
+
+class GopZteTest(unittest.TestCase):
+    def test_may_wifi_duoi_zte_va_chu_ky_zte(self):
+        r, z, dh = RouterGia(), ZteGia(), DongHo()
+        r.db[f"{L.ARP_MAC}.6.172.16.10.24"] = "aabbccddee02"      # ARP của chính ZTE
+        tt = ThuThap(r, None, dh, zte=z)
+        d = chay(tt.cap_nhat())
+        may = {c["mac"]: c for c in d["tree"]["clients"]}
+        self.assertEqual(may["AA:BB:CC:DD:EE:01"]["parent"], "zte")
+        self.assertEqual(may["AA:BB:CC:DD:EE:01"]["rssi"], -58)
+        self.assertEqual(d["zte"]["trang_thai"], "ok")
+        dh.t += 5
+        chay(tt.cap_nhat())
+        self.assertEqual(z.so_lan, 1)               # chưa tới hạn đọc ZTE (15 giây)
+        dh.t += 20
+        chay(tt.cap_nhat())
+        self.assertEqual(z.so_lan, 2)
+
+    def test_zte_loi_giu_danh_sach_cu_va_ghi_trang_thai(self):
+        class ZteLoiDangNhap(Exception):
+            pass
+        r, z, dh = RouterGia(), ZteGia(), DongHo()
+        tt = ThuThap(r, None, dh, zte=z)
+        chay(tt.cap_nhat())
+        z.loi = ZteLoiDangNhap("sai mat khau")
+        dh.t += 20
+        d = chay(tt.cap_nhat())
+        self.assertEqual(d["zte"]["trang_thai"], "loi_dang_nhap")
+        self.assertEqual(len(d["zte"]["clients"]), 1)              # giữ lần đọc tốt gần nhất
+        self.assertIn("interfaces", d)                              # phần MikroTik vẫn chạy
+        self.assertEqual({c["mac"]: c for c in d["tree"]["clients"]}["AA:BB:CC:DD:EE:01"]["parent"], "zte")
+
+    def test_khong_khai_zte_thi_khong_co_nut_zte(self):
+        d = chay(ThuThap(RouterGia(), None, DongHo()).cap_nhat())
+        self.assertIsNone(d["zte"])
+        self.assertNotIn("zte", {n["id"] for n in d["tree"]["nodes"]})
+
+
+class NguonZteBaoVeTest(unittest.TestCase):
+    def test_nghi_30_phut_sau_loi_dang_nhap(self):
+        from mikrotik_snmp.zte_nguon import NguonZte, ZteTamNgung
+        from mikrotik_snmp.zte_api import ZteLoiDangNhap
+
+        class May:
+            so = 0
+
+            def doc_thiet_bi(self):
+                May.so += 1
+                raise ZteLoiDangNhap("sai")
+
+        async def chay_nen(f):
+            return f()
+        dh = DongHo()
+        n = NguonZte(May(), "172.16.10.24", chay_nen, dh)
+        with self.assertRaises(ZteLoiDangNhap):
+            chay(n.doc())
+        for _ in range(3):
+            with self.assertRaises(ZteTamNgung):
+                chay(n.doc())
+        self.assertEqual(May.so, 1)                               # không gõ mật khẩu lại trong lúc nghỉ
+        dh.t += 1801
+        with self.assertRaises(ZteLoiDangNhap):
+            chay(n.doc())
+        self.assertEqual(May.so, 2)
+
+
+class CauTrucGopTest(unittest.TestCase):
+    """Cấu trúc của bản gộp (không cần Home Assistant)."""
+
+    def _nguon(self, ten):
+        return (ROOT / "custom_components" / "mikrotik_snmp" / ten).read_text(encoding="utf-8")
+
+    def test_co_nen_tang_device_tracker_va_cay(self):
+        self.assertIn("Platform.DEVICE_TRACKER", self._nguon("__init__.py"))
+        sensor = self._nguon("sensor.py")
+        self.assertIn('f"sensor.{coordinator.tien_to}_cay_thiet_bi"', sensor)
+        self.assertIn("_unrecorded_attributes", sensor)           # thuộc tính lớn không ghi vào cơ sở dữ liệu lịch sử
+
+    def test_zte_la_tuy_chon(self):
+        self.assertIn("co_zte", self._nguon("__init__.py"))
+        self.assertIn("if coordinator.co_zte:", self._nguon("sensor.py"))
+
+    def test_may_con_gan_dung_cha(self):
+        tracker = self._nguon("device_tracker.py")
+        self.assertIn("via_device=self._cha", tracker)
+        self.assertIn("dinh_danh_cha", tracker)
+
+    def test_mat_khau_zte_khong_vao_log(self):
+        for ten in ("zte_api.py", "zte_nguon.py", "config_flow.py", "__init__.py"):
+            for dong in self._nguon(ten).splitlines():
+                if "LOGGER." in dong or "print(" in dong:
+                    self.assertNotIn("mat_khau", dong)
+
+
 class CauTrucTest(unittest.TestCase):
     def test_moi_khoa_python_bien_dich_duoc(self):
         for f in (ROOT / "custom_components" / "mikrotik_snmp").glob("*.py"):

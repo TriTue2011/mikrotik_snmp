@@ -13,10 +13,11 @@ from . import logic as L
 from .const import (
     AUTH_MAC_DINH, AUTH_PROTOCOLS, CHU_KY_LON_NHAT, CHU_KY_MAC_DINH, CHU_KY_NHO_NHAT, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL,
     CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_PORT, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN,
-    PORT_MAC_DINH, PRIV_MAC_DINH, PRIV_PROTOCOLS, TIEN_TO_MAC_DINH,
+    CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, PORT_MAC_DINH, PRIV_MAC_DINH, PRIV_PROTOCOLS, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoiDangNhap, SnmpLoiKetNoi
 from .thu_thap import ThuThap
+from .zte_api import ZteE2633, ZteLoiDangNhap, ZteLoiKetNoi
 
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
 TIEN_TO_RE = re.compile(r"^[a-z0-9_]{1,40}$")
@@ -93,8 +94,41 @@ class MikrotikSnmpConfigFlow(ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(user_input[CONF_HOST])
                     self._abort_if_unique_id_configured()
                     self._du = user_input
-                    return await self.async_step_cong()
+                    return await self.async_step_zte()
         return self.async_show_form(step_id="user", data_schema=_schema(user_input or {}), errors=loi)
+
+    async def async_step_zte(self, user_input: dict[str, Any] | None = None):
+        """Bước tuỳ chọn: có bộ phát ZTE E2633 thì đăng nhập thêm để đưa máy WiFi thành con của ZTE. Bỏ trống IP để bỏ qua."""
+        loi: dict[str, str] = {}
+        if user_input is not None:
+            host = (user_input.get(CONF_ZTE_HOST) or "").strip()
+            if not host:
+                return await self.async_step_cong()
+            if not HOST_RE.match(host):
+                loi["base"] = "host_sai"
+            else:
+                may = ZteE2633(host, user_input.get(CONF_ZTE_TEN, ""), user_input.get(CONF_ZTE_MAT_KHAU, ""),
+                               xac_minh_ssl=user_input.get(CONF_ZTE_SSL, False))
+                try:
+                    await self.hass.async_add_executor_job(may.doc_thiet_bi)
+                except ZteLoiDangNhap:
+                    loi["base"] = "dang_nhap_zte"
+                except ZteLoiKetNoi:
+                    loi["base"] = "ket_noi_zte"
+                except Exception:  # noqa: BLE001
+                    loi["base"] = "khong_ro"
+                else:
+                    self._du.update({CONF_ZTE_HOST: host, CONF_ZTE_TEN: user_input.get(CONF_ZTE_TEN, ""),
+                                     CONF_ZTE_MAT_KHAU: user_input.get(CONF_ZTE_MAT_KHAU, ""),
+                                     CONF_ZTE_SSL: user_input.get(CONF_ZTE_SSL, False)})
+                    return await self.async_step_cong()
+        mac_dinh = user_input or {}
+        return self.async_show_form(step_id="zte", errors=loi, data_schema=vol.Schema({
+            vol.Optional(CONF_ZTE_HOST, default=mac_dinh.get(CONF_ZTE_HOST, "")): str,
+            vol.Optional(CONF_ZTE_TEN, default=mac_dinh.get(CONF_ZTE_TEN, "user")): str,
+            vol.Optional(CONF_ZTE_MAT_KHAU, default=""): MAT_KHAU,
+            vol.Optional(CONF_ZTE_SSL, default=mac_dinh.get(CONF_ZTE_SSL, False)): bool,
+        }))
 
     async def async_step_cong(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:

@@ -1,0 +1,17 @@
+{
+ "apData": {
+  "1": {
+   "SoftwareVer": "V1.0.4",
+   "IF_ERRORID": 0,
+   "BhStaRssi": "0",
+   "instID": "MESH.CONTROLLER",
+   "LinkSpeed": "0",
+   "role": "controller",
+   "MacAddr": "02:00:00:00:00:ff",
+   "AccessType": "Connecting",
+   "DeviceName": "ZTE:ZXHN E2633",
+   "IpAddr": "192.168.88.2"
+  },
+  "MGET_INST_NUM": 1
+ }
+}

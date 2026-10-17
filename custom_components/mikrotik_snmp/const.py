@@ -13,6 +13,11 @@ CONF_CHU_KY = "chu_ky"
 CONF_TIEN_TO = "tien_to"
 CONF_CONG = "cong"
 
+CONF_ZTE_HOST = "zte_host"
+CONF_ZTE_TEN = "zte_ten"
+CONF_ZTE_MAT_KHAU = "zte_mat_khau"
+CONF_ZTE_SSL = "zte_xac_minh_ssl"
+
 PORT_MAC_DINH = 161
 CHU_KY_MAC_DINH = 5
 CHU_KY_NHO_NHAT = 2
@@ -22,6 +27,9 @@ AUTH_MAC_DINH = "hmac-sha"
 PRIV_MAC_DINH = "aes-cfb-128"
 # Thông tin chậm đổi (trạng thái, lỗi, nhiệt độ…) chỉ hỏi mỗi từng ấy giây; bộ đếm lưu lượng hỏi mỗi chu kỳ.
 CHU_KY_CHAM_GIAY = 30
+# ZTE (máy WiFi) đọc mỗi từng ấy giây; sau lỗi đăng nhập nghỉ THOI_GIAN_TAM_DUNG giây.
+CHU_KY_ZTE_GIAY = 15
+THOI_GIAN_TAM_DUNG = 1800
 # Bảng ARP và bảng MAC (máy nào, IP nào, cổng nào) đọc mỗi từng ấy giây.
 CHU_KY_THIET_BI_GIAY = 15
 # Danh sách giao diện chỉ dò lại sau từng ấy giây (giao diện mới xuất hiện).

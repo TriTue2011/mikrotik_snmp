@@ -13,13 +13,17 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     AUTH_MAC_DINH, CHU_KY_MAC_DINH, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL, CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_PORT,
-    CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN, PORT_MAC_DINH, PRIV_MAC_DINH, TIEN_TO_MAC_DINH,
+    CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, DOMAIN,
+    PORT_MAC_DINH, PRIV_MAC_DINH, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoi, SnmpLoiDangNhap
+from .thiet_bi import dinh_danh_cha
 from .thu_thap import ThuThap
+from .zte_api import ZteE2633
+from .zte_nguon import NguonZte
 
 LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.DEVICE_TRACKER]
 
 
 def cau_hinh_hieu_luc(entry: ConfigEntry) -> dict:
@@ -37,7 +41,13 @@ class MikrotikSnmpCoordinator(DataUpdateCoordinator):
             hass, cfg[CONF_HOST], cfg.get(CONF_PORT, PORT_MAC_DINH), cfg[CONF_TEN], cfg[CONF_AUTH_KEY], cfg[CONF_PRIV_KEY],
             cfg.get(CONF_AUTH_PROTOCOL, AUTH_MAC_DINH), cfg.get(CONF_PRIV_PROTOCOL, PRIV_MAC_DINH),
         )
-        self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None)
+        zte = None
+        self.co_zte = bool(cfg.get(CONF_ZTE_HOST))
+        if self.co_zte:
+            zte = NguonZte(ZteE2633(cfg[CONF_ZTE_HOST], cfg.get(CONF_ZTE_TEN, ""), cfg.get(CONF_ZTE_MAT_KHAU, ""),
+                                    xac_minh_ssl=cfg.get(CONF_ZTE_SSL, False)),
+                           cfg[CONF_ZTE_HOST], hass.async_add_executor_job)
+        self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None, zte=zte)
 
     async def _async_update_data(self):
         try:
@@ -60,6 +70,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manufacturer="MikroTik",
         model=core.get("descr"),
     )
+    # Dựng sẵn thiết bị cổng và ZTE để thực thể con gắn via_device được (cổng trước, rồi ZTE là con của cổng).
+    so_thiet_bi = dr.async_get(hass)
+    du_lieu = coordinator.data or {}
+    for chi_so, gd in (du_lieu.get("interfaces") or {}).items():
+        so_thiet_bi.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"{entry.entry_id}_{chi_so}")},
+                               name=gd["name"], manufacturer="MikroTik", via_device=(DOMAIN, entry.entry_id))
+    if coordinator.co_zte:
+        nut_zte = next((n for n in (du_lieu.get("tree") or {}).get("nodes", []) if n["id"] == "zte"), {})
+        ap = (du_lieu.get("zte") or {}).get("ap") or {}
+        so_thiet_bi.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"{entry.entry_id}_zte")},
+                               name=nut_zte.get("name") or "ZTE E2633", manufacturer="ZTE", model="E2633",
+                               sw_version=ap.get("firmware") or None,
+                               via_device=dinh_danh_cha(entry.entry_id, nut_zte.get("parent"), du_lieu))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_khi_tuy_chon_doi))
     return True

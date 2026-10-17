@@ -1,5 +1,5 @@
 {
-  "name": "MikroTik (SNMP, chỉ đọc)",
+  "name": "Mạng LAN: MikroTik (SNMP) + ZTE E2633",
   "render_readme": true,
   "homeassistant": "2024.11.0"
 }

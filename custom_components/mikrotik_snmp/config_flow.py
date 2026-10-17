@@ -16,7 +16,7 @@ from .const import (
     CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, PORT_MAC_DINH, PRIV_MAC_DINH, PRIV_PROTOCOLS, TIEN_TO_MAC_DINH,
 )
 from .snmp_client import SnmpClient, SnmpLoiDangNhap, SnmpLoiKetNoi
-from .thu_thap import ThuThap
+from .thu_thap import LoiDuLieu, ThuThap
 from .zte_api import ZteE2633, ZteLoiDangNhap, ZteLoiKetNoi
 
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
@@ -88,6 +88,8 @@ class MikrotikSnmpConfigFlow(ConfigFlow, domain=DOMAIN):
                     loi["base"] = "dang_nhap"
                 except SnmpLoiKetNoi:
                     loi["base"] = "ket_noi"
+                except LoiDuLieu:
+                    loi["base"] = "khong_co_cong"
                 except Exception:  # noqa: BLE001 - lỗi lạ (ví dụ thiếu pysnmp): báo chung, chi tiết ở nhật ký
                     loi["base"] = "khong_ro"
                 else:

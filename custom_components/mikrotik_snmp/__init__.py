@@ -18,7 +18,7 @@ from .const import (
 )
 from .snmp_client import SnmpClient, SnmpLoi, SnmpLoiDangNhap
 from .thiet_bi import dinh_danh_cha
-from .thu_thap import ThuThap
+from .thu_thap import LoiDuLieu, ThuThap
 from .zte_api import ZteE2633
 from .zte_nguon import NguonZte
 
@@ -54,7 +54,7 @@ class MikrotikSnmpCoordinator(DataUpdateCoordinator):
             return await self.thu_thap.cap_nhat()
         except SnmpLoiDangNhap as loi:
             raise ConfigEntryAuthFailed(str(loi)) from loi
-        except SnmpLoi as loi:
+        except (SnmpLoi, LoiDuLieu) as loi:
             raise UpdateFailed(str(loi)) from loi
 
 

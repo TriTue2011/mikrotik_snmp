@@ -48,7 +48,8 @@
       "ket_noi": "Cannot reach the router (timeout). Check the address, port 161 and the firewall.",
       "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing).",
       "dang_nhap_zte": "The ZTE rejected the login: check username and password, and whether it is logged in elsewhere.",
-      "ket_noi_zte": "Cannot reach the ZTE. Check the address and the network."
+      "ket_noi_zte": "Cannot reach the ZTE. Check the address and the network.",
+      "khong_co_cong": "The router answered but returned no port list. Check the SNMP (read-only) community and the address."
     },
     "abort": {
       "already_configured": "This router is already added.",

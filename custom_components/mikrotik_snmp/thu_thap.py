@@ -13,6 +13,10 @@ from .cay import xay_cay
 from .const import CHU_KY_CHAM_GIAY, CHU_KY_DO_LAI_GIAY, CHU_KY_THIET_BI_GIAY, CHU_KY_ZTE_GIAY, TOI_DA_OID_MOI_LAN
 
 
+class LoiDuLieu(Exception):
+    """Router trả lời nhưng dữ liệu thiếu (ví dụ không có danh sách cổng)."""
+
+
 class MayKhach(Protocol):
     async def get(self, oids: list[str]) -> dict[str, Any]: ...
     async def walk(self, goc: str, hex_octet: bool = False) -> dict[str, Any]: ...
@@ -65,6 +69,8 @@ class ThuThap:
         ten = await self._mk.walk(L.IF_NAME)
         loai = await self._mk.walk(L.IF_TYPE)
         gd = L.phan_tich_giao_dien(ten, loai)
+        if not gd:
+            raise LoiDuLieu("router không trả danh sách cổng (ifName): kiểm quyền SNMP và địa chỉ")
         try:
             ghi_chu = await self._mk.walk(L.IF_ALIAS)
         except Exception:  # noqa: BLE001 - ghi chú không bắt buộc; thiếu thì để trống

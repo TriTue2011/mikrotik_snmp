@@ -33,6 +33,28 @@ def _phan_loai(loi: Any) -> SnmpLoi:
     return SnmpLoiDangNhap(str(loi)[:120])
 
 
+_TIEN_TO_CHU = {"SNMPv2-SMI::mib-2": "1.3.6.1.2.1", "SNMPv2-SMI::enterprises": "1.3.6.1.4.1", "SNMPv2-SMI::internet": "1.3.6.1"}
+
+
+def oid_so(ten: Any) -> str:
+    """Tên OID của một biến trả về → chuỗi SỐ «1.3.6.1.2.1…». Thư viện in tên dạng chữ (prettyPrint: «SNMPv2-SMI::mib-2.31…»)
+    nên KHÔNG dùng nó làm khoá. Ưu tiên get_oid()/getOid(); dự phòng: tách tiền tố chữ đã biết."""
+    for ham in ("get_oid", "getOid"):
+        f = getattr(ten, ham, None)
+        if callable(f):
+            try:
+                kq = str(f()).lstrip(".")
+            except Exception:  # noqa: BLE001 - thử cách kế
+                continue
+            if kq and all(p.isdigit() for p in kq.split(".")):
+                return kq
+    chu = str(ten.prettyPrint() if hasattr(ten, "prettyPrint") else ten).lstrip(".")
+    for tien_to, so in _TIEN_TO_CHU.items():
+        if chu.startswith(tien_to + "."):
+            return so + chu[len(tien_to):]
+    return chu
+
+
 def _gia_tri(v: Any, hex_octet: bool = False) -> Any:
     if type(v).__name__ in ("NoSuchObject", "NoSuchInstance", "EndOfMibView"):
         return None
@@ -85,10 +107,17 @@ class SnmpClient:
         if trang_thai:
             raise SnmpLoi(f"router báo lỗi SNMP: {trang_thai.prettyPrint()[:60]}")
         ra: dict[str, Any] = {}
+        if len(var) == len(oids):
+            # Trả lời theo ĐÚNG thứ tự yêu cầu: ghép theo vị trí, không phụ thuộc cách thư viện in tên OID.
+            for oid, (_ten, gia_tri) in zip(oids, var):
+                v = _gia_tri(gia_tri)
+                if v is not None:
+                    ra[oid] = v
+            return ra
         for ten, gia_tri in var:
             v = _gia_tri(gia_tri)
             if v is not None:
-                ra[str(ten.prettyPrint() if hasattr(ten, "prettyPrint") else ten).lstrip(".")] = v
+                ra[oid_so(ten)] = v
         return ra
 
     async def walk(self, goc: str, hex_octet: bool = False) -> dict[str, Any]:
@@ -104,7 +133,10 @@ class SnmpClient:
             if trang_thai or not var:
                 break
             ten, gia_tri = var[0]
-            oid = str(ten.prettyPrint() if hasattr(ten, "prettyPrint") else ten).lstrip(".")
+            oid = oid_so(ten)
+            if not all(p.isdigit() for p in oid.split(".")):
+                # Thư viện không cho tên dạng số: báo rõ (không im lặng trả bảng rỗng). Tên in ra không chứa bí mật.
+                raise SnmpLoi(f"không đọc được OID dạng số từ thư viện SNMP (nhận «{oid[:60]}»)")
             if hau_to(oid, goc) is None:
                 break
             v = _gia_tri(gia_tri, hex_octet)

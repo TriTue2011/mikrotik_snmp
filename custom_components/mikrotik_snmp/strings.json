@@ -48,7 +48,8 @@
       "ket_noi": "Không tới được router (hết thời gian chờ). Kiểm địa chỉ, cổng 161 và tường lửa.",
       "khong_ro": "Lỗi không rõ khi đọc SNMP. Xem Nhật ký Home Assistant (có thể thiếu thư viện pysnmp).",
       "dang_nhap_zte": "ZTE từ chối đăng nhập: kiểm tên và mật khẩu, và xem bộ phát có đang đăng nhập ở nơi khác không.",
-      "ket_noi_zte": "Không tới được ZTE. Kiểm địa chỉ và mạng."
+      "ket_noi_zte": "Không tới được ZTE. Kiểm địa chỉ và mạng.",
+      "khong_co_cong": "Router trả lời nhưng không có danh sách cổng. Kiểm quyền SNMP (community chỉ-đọc) và địa chỉ."
     },
     "abort": {
       "already_configured": "Router này đã được thêm.",

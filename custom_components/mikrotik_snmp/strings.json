@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MikroTik qua SNMP",
+        "description": "Nhập địa chỉ router và người dùng SNMPv3 (chỉ đọc). Mật khẩu chỉ gồm chữ và số là an toàn nhất.",
+        "data": {
+          "host": "Địa chỉ IP hoặc tên máy",
+          "port": "Cổng SNMP",
+          "ten": "Tên người dùng SNMPv3",
+          "auth_key": "Mật khẩu xác thực",
+          "priv_key": "Mật khẩu mã hoá",
+          "auth_protocol": "Giao thức xác thực",
+          "priv_protocol": "Giao thức mã hoá",
+          "tien_to": "Tiền tố tên thực thể (khớp card)",
+          "chu_ky": "Chu kỳ đọc (giây)"
+        }
+      },
+      "cong": {
+        "title": "Chọn cổng",
+        "description": "Chọn các cổng muốn hiển thị. Đổi lại sau trong nút Tuỳ chọn.",
+        "data": {
+          "cong": "Cổng"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nhập lại mật khẩu SNMP",
+        "data": {
+          "auth_key": "Mật khẩu xác thực",
+          "priv_key": "Mật khẩu mã hoá"
+        }
+      }
+    },
+    "error": {
+      "host_sai": "Địa chỉ chỉ được chứa chữ, số, dấu chấm và dấu gạch ngang.",
+      "tien_to_sai": "Tiền tố chỉ gồm chữ thường, số và dấu gạch dưới.",
+      "dang_nhap": "Router từ chối: kiểm tên người dùng, hai mật khẩu và giao thức (xác thực SHA, mã hoá AES).",
+      "ket_noi": "Không tới được router (hết thời gian chờ). Kiểm địa chỉ, cổng 161 và tường lửa.",
+      "khong_ro": "Lỗi không rõ khi đọc SNMP. Xem Nhật ký Home Assistant (có thể thiếu thư viện pysnmp)."
+    },
+    "abort": {
+      "already_configured": "Router này đã được thêm.",
+      "reauth_successful": "Đã cập nhật mật khẩu."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tuỳ chọn MikroTik SNMP",
+        "data": {
+          "chu_ky": "Chu kỳ đọc (giây)",
+          "cong": "Cổng hiển thị"
+        }
+      }
+    }
+  }
+}

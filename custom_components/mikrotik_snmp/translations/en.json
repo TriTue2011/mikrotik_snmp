@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MikroTik via SNMP",
+        "description": "Enter the router address and a read-only SNMPv3 user. Passwords with only letters and digits are safest.",
+        "data": {
+          "host": "IP address or hostname",
+          "port": "SNMP port",
+          "ten": "SNMPv3 username",
+          "auth_key": "Authentication password",
+          "priv_key": "Encryption password",
+          "auth_protocol": "Authentication protocol",
+          "priv_protocol": "Encryption protocol",
+          "tien_to": "Entity name prefix (matches the card)",
+          "chu_ky": "Poll interval (seconds)"
+        }
+      },
+      "cong": {
+        "title": "Choose ports",
+        "description": "Pick the ports to show. You can change this later in Options.",
+        "data": {
+          "cong": "Ports"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter SNMP passwords",
+        "data": {
+          "auth_key": "Authentication password",
+          "priv_key": "Encryption password"
+        }
+      }
+    },
+    "error": {
+      "host_sai": "The address may only contain letters, digits, dots and hyphens.",
+      "tien_to_sai": "The prefix may only contain lowercase letters, digits and underscores.",
+      "dang_nhap": "The router rejected the login: check the username, both passwords and protocols (SHA auth, AES encryption).",
+      "ket_noi": "Cannot reach the router (timeout). Check the address, port 161 and the firewall.",
+      "khong_ro": "Unknown SNMP error. See the Home Assistant log (the pysnmp library may be missing)."
+    },
+    "abort": {
+      "already_configured": "This router is already added.",
+      "reauth_successful": "Passwords updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MikroTik SNMP options",
+        "data": {
+          "chu_ky": "Poll interval (seconds)",
+          "cong": "Ports to show"
+        }
+      }
+    }
+  }
+}

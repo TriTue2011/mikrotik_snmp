@@ -5,8 +5,16 @@ Khuôn đã đo từ trang của thiết bị: mỗi máy có MacAddr, IpAddr, H
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
+
+LOGGER = logging.getLogger(__name__)
+
+
+class DuLieuSaiKhuon(ValueError):
+    """Bộ phát có trả mục máy nhưng không đọc nổi mục nào (đổi tên trường, đổi khuôn): ĐỌC HỎNG, không phải «không có máy»."""
+
 
 BAND = {"1": "2.4G", "2": "5G"}
 
@@ -43,8 +51,15 @@ def _muc(du_lieu: Any) -> list[dict]:
 
 
 def phan_tich_thiet_bi(du_lieu: Any) -> list[dict]:
-    """JSON GetALLClients → danh sách {mac, ip, name, band, rssi, mode, assoc_s, rx_bps, tx_bps}. Mục có MAC sai khuôn bị bỏ."""
+    """JSON GetALLClients → danh sách {mac, ip, name, band, rssi, mode, assoc_s, rx_bps, tx_bps}. Mục có MAC sai khuôn bị bỏ.
+
+    «Không có máy» chỉ khi bộ phát báo rõ: khối rỗng ({} hoặc []) hoặc MGET_INST_NUM = 0. Có mục (khoá số) hoặc MGET_INST_NUM > 0
+    mà không đọc nổi mục nào thì ném DuLieuSaiKhuon — nếu không, một lần bộ phát đổi tên trường sẽ chuyển mọi thiết bị theo dõi
+    thành «không ở nhà». Chỉ MỘT PHẦN mục hỏng thì giữ các mục đọc được và ghi log DEBUG số mục bị bỏ.
+    """
     goc = du_lieu.get("clientsData") if isinstance(du_lieu, dict) else None
+    so_muc = len([k for k in goc if str(k).isdigit()]) if isinstance(goc, dict) else 0
+    bao_so = _so_nguyen(goc.get("MGET_INST_NUM"), 0) if isinstance(goc, dict) else 0
     ra: list[dict] = []
     for m in _muc(goc):
         mac = str(m.get("MacAddr", "")).strip().lower()
@@ -64,6 +79,10 @@ def phan_tich_thiet_bi(du_lieu: Any) -> list[dict]:
             "tx_mbps": _so_nguyen(m.get("TxRateMbps")),
             "goc": thuoc_tinh_goc(m, TEN_GOC_MAY),
         })
+    if not ra and (so_muc or bao_so > 0):
+        raise DuLieuSaiKhuon(f"bộ phát trả {so_muc or bao_so} mục máy nhưng không đọc nổi mục nào")
+    if so_muc > len(ra):
+        LOGGER.debug("bỏ %d/%d mục máy không đọc được (sai khuôn), giữ %d", so_muc - len(ra), so_muc, len(ra))
     return ra
 
 

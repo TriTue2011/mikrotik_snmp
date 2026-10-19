@@ -32,3 +32,7 @@ class NguonZte:
         except ZteLoiDangNhap:
             self._tam_dung_den = self._dong_ho() + THOI_GIAN_TAM_DUNG
             raise
+
+    def dong(self) -> None:
+        """Đóng/quên phiên ZTE phía máy khách."""
+        self._may.dang_xuat()

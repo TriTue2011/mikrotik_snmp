@@ -35,3 +35,13 @@ def ten_thiet_bi(may: dict[str, Any] | None, mac: str) -> str:
     """Tên thiết bị hiển thị: tên đã đặt, không có thì IP, không có nữa thì MAC. Vị trí (cổng, bridge, ZTE) nằm ở thiết bị cha (via_device)."""
     may = may or {}
     return may.get("name") or may.get("ip") or mac
+
+
+def zte_dang_loi(du_lieu: dict[str, Any] | None) -> bool:
+    """True nếu có nguồn ZTE và trạng thái ZTE khác 'ok' và 'chua_doc'."""
+    if not du_lieu:
+        return False
+    zte = du_lieu.get("zte")
+    if not zte:
+        return False
+    return zte.get("trang_thai") not in ("ok", "chua_doc")

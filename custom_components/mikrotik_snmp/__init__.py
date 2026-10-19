@@ -37,7 +37,7 @@ def cau_hinh_hieu_luc(entry: ConfigEntry) -> dict:
 class MikrotikSnmpCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         cfg = cau_hinh_hieu_luc(entry)
-        super().__init__(hass, LOGGER, name=DOMAIN, update_interval=timedelta(seconds=cfg.get(CONF_CHU_KY, CHU_KY_MAC_DINH)))
+        super().__init__(hass, LOGGER, name=DOMAIN, update_interval=timedelta(seconds=cfg.get(CONF_CHU_KY, CHU_KY_MAC_DINH)), config_entry=entry)
         self.tien_to: str = cfg.get(CONF_TIEN_TO, TIEN_TO_MAC_DINH)
         self.host: str = cfg[CONF_HOST]
         self.client = SnmpClient(
@@ -50,6 +50,7 @@ class MikrotikSnmpCoordinator(DataUpdateCoordinator):
             zte = NguonZte(ZteE2633(cfg[CONF_ZTE_HOST], cfg.get(CONF_ZTE_TEN, ""), cfg.get(CONF_ZTE_MAT_KHAU, ""),
                                     xac_minh_ssl=cfg.get(CONF_ZTE_SSL, False)),
                            cfg[CONF_ZTE_HOST], hass.async_add_executor_job)
+        self._zte = zte
         api = None
         self.co_api = bool(cfg.get(CONF_API_TEN))
         if self.co_api:
@@ -112,4 +113,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             coordinator.client.dong()
             if coordinator._api is not None:
                 coordinator._api.dong()
+            if coordinator._zte is not None:
+                coordinator._zte.dong()
     return ok

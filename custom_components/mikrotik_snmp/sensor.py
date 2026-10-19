@@ -9,7 +9,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, PERCENTAGE, UnitOfDataRate, UnitOfElectricPotential, UnitOfInformation, UnitOfTemperature, UnitOfTime
+from homeassistant.const import EntityCategory, MATCH_ALL, PERCENTAGE, UnitOfDataRate, UnitOfElectricPotential, UnitOfInformation, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo, format_mac
 from homeassistant.helpers import entity_registry as er
@@ -18,7 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .logic import slug
-from .thiet_bi import cha_cua_giao_dien, dinh_danh_cha, ten_thiet_bi
+from .thiet_bi import cha_cua_giao_dien, dinh_danh_cha, ten_thiet_bi, zte_dang_loi
 
 
 def thiet_bi_giao_dien(entry: ConfigEntry, chi_so: int, ten: str, du_lieu: dict[str, Any] | None) -> DeviceInfo:
@@ -185,6 +185,7 @@ class HeThongSensor(CoordinatorEntity, SensorEntity):
 class BangMacSensor(CoordinatorEntity, SensorEntity):
     """Bảng MAC theo cổng cho `mac_sensor` của card: trạng thái là tổng số MAC, thuộc tính là {tên cổng: [MAC…]}."""
 
+    _unrecorded_attributes = frozenset({MATCH_ALL})
     _attr_has_entity_name = True
     _attr_name = "Bảng MAC"
     _attr_icon = "mdi:table-network"
@@ -208,6 +209,7 @@ class BangMacSensor(CoordinatorEntity, SensorEntity):
 class ThietBiLanSensor(CoordinatorEntity, SensorEntity):
     """Danh sách thiết bị trong LAN (thuộc tính `clients`: mac, ip, interface) cho `sources` của card."""
 
+    _unrecorded_attributes = frozenset({"clients"})
     _attr_has_entity_name = True
     _attr_name = "Thiết bị trong LAN"
     _attr_icon = "mdi:lan"
@@ -334,7 +336,7 @@ class CamBienWifiMay(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and _may_wifi(self.coordinator, self._mac) is not None
+        return super().available and not zte_dang_loi(self.coordinator.data) and _may_wifi(self.coordinator, self._mac) is not None
 
     @property
     def native_value(self):
@@ -368,6 +370,10 @@ class ZteSoMaySensor(_ZteThietBi):
         self.entity_id = f"sensor.{coordinator.tien_to}_zte_{ma}"
 
     @property
+    def available(self) -> bool:
+        return super().available and not zte_dang_loi(self.coordinator.data)
+
+    @property
     def native_value(self) -> int | None:
         if self._zte.get("trang_thai") in (None, "chua_doc"):
             return None
@@ -392,6 +398,10 @@ class ZteBoPhatSensor(_ZteThietBi):
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_zte_bo_phat"
         self.entity_id = f"sensor.{coordinator.tien_to}_zte_bo_phat"
+
+    @property
+    def available(self) -> bool:
+        return super().available and not zte_dang_loi(self.coordinator.data)
 
     @property
     def native_value(self) -> str | None:

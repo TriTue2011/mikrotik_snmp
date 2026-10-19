@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .thiet_bi import dinh_danh_cha, ten_thiet_bi
+from .thiet_bi import dinh_danh_cha, ten_thiet_bi, zte_dang_loi
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -90,6 +90,18 @@ class MayLan(CoordinatorEntity, ScannerEntity):
                         so_thiet_bi.async_update_device(dev.id, **cap_nhat)
                 self._cha, self._ten_cuoi = moi, ten_moi
         super()._handle_coordinator_update()
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        may = self._may
+        if may is not None:
+            if may.get("wifi") and zte_dang_loi(self.coordinator.data):
+                return False
+        elif zte_dang_loi(self.coordinator.data) and self._cha == dinh_danh_cha(self._entry_id, "zte", self.coordinator.data):
+            return False
+        return True
 
     @property
     def source_type(self) -> SourceType:

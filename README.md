@@ -10,7 +10,9 @@ Tích hợp này **không có đường ghi nào trong mã**: SNMP chỉ đọc,
 ## Mục lục
 1. [Nó làm gì](#nó-làm-gì) · 2. [Yêu cầu](#yêu-cầu) · 3. [Cài đặt](#cài-đặt) · 4. [Chuẩn bị MikroTik](#chuẩn-bị-mikrotik) ·
 5. [Thêm tích hợp](#thêm-tích-hợp-vào-home-assistant) · 6. [Tuỳ chọn](#tuỳ-chọn-nút-bánh-răng) · 7. [Cây thiết bị](#cây-thiết-bị) ·
-8. [Thực thể](#thực-thể) · 9. [Dùng với card](#dùng-với-card) · 10. [Bảo mật](#bảo-mật) · 11. [Khắc phục sự cố](#khắc-phục-sự-cố) · 12. [Trạng thái kiểm chứng](#trạng-thái-kiểm-chứng-nói-thật)
+8. [Thực thể](#thực-thể) · 9. [Dùng với card](#dùng-với-card) · 10. [Bảo mật](#bảo-mật) · 11. [Khắc phục sự cố](#khắc-phục-sự-cố) ·
+12. [Bộ phát chỉ cho một phiên](#bộ-phát-chỉ-cho-một-phiên-không-chạy-hai-tích-hợp-zte-cùng-lúc) · 13. [Thu log gỡ lỗi đã che](#cách-thu-log-gỡ-lỗi-đã-che) ·
+14. [Trạng thái kiểm chứng](#trạng-thái-kiểm-chứng-nói-thật) · 15. [Thay đổi ở 0.7.1](#thay-đổi-ở-071)
 
 ## Nó làm gì
 Ba nguồn dữ liệu, **chỉ SNMP là bắt buộc**; hai nguồn còn lại tuỳ chọn và hỏng thì phần còn lại vẫn chạy:
@@ -35,7 +37,7 @@ Giới hạn của thiết bị, không phải của tích hợp: SNMP của Rou
 
 **Thủ công:** chép thư mục `custom_components/mikrotik_snmp` của kho này vào `/config/custom_components/`, rồi khởi động lại Home Assistant.
 
-**Cập nhật:** khi có thay đổi mới trên kho, HACS báo cập nhật → Cập nhật → khởi động lại Home Assistant. Số phiên bản nằm ở `manifest.json` (hiện 0.7.0). Kho chưa phát hành bản đóng gói (Releases), nên HACS theo nhánh `main`.
+**Cập nhật:** khi có thay đổi mới trên kho, HACS báo cập nhật → Cập nhật → khởi động lại Home Assistant. Số phiên bản nằm ở `manifest.json` (hiện 0.7.1). Kho chưa phát hành bản đóng gói (Releases), nên HACS theo nhánh `main`.
 
 ## Chuẩn bị MikroTik
 Thay `<IP_HA>` bằng địa chỉ máy chạy Home Assistant (ví dụ `192.168.88.10`). Chạy trong Terminal của WinBox hoặc SSH.
@@ -137,7 +139,7 @@ MikroTik ─┬─ BridgeLAN ─┬─ ether2 ── ZTE E2633 ── máy WiFi 
 
 Giá trị của `sensor.<tt>_zte_trang_thai`: `ok`, `loi_dang_nhap`, `loi_ket_noi`, `tam_ngung`, `chua_doc`.
 Giá trị của `sensor.<tt>_api_trang_thai`: `ok`, `kid_control_khong_co`, `loi_dang_nhap`, `loi_van_tay`, `loi_ket_noi`, `tam_ngung`, `chua_doc`.
-`tam_ngung` = đang nghỉ 30 phút sau một lần đăng nhập thất bại (để không khoá tài khoản).
+`tam_ngung` = đang nghỉ 30 phút sau khi bị bộ phát từ chối đăng nhập (để không khoá tài khoản; lỗi mạng thường tự hồi phục, không tạm ngừng).
 
 Nếu tích hợp MikroTik cũ hoặc `zte_e2633` riêng còn cài, mã thực thể có thể trùng (Home Assistant thêm đuôi `_2`): gỡ bản cũ trước, hoặc đặt tiền tố khác.
 
@@ -154,7 +156,7 @@ Thiết bị mới vào mạng thì tự có thực thể và tự nối vào s�
 - **Không có đường ghi**: SNMP community `write-access=no`; máy khách SNMP không có lệnh SET (có test); máy khách API chỉ gửi lệnh kết thúc bằng `/print`, mọi lệnh khác bị từ chối **trước khi gửi** (có test).
 - **API chỉ qua TLS** (cổng 8729) và **ghim vân tay SHA-256 của chứng chỉ**: lần đầu (khi bấm Gửi ở bước API) tích hợp đọc vân tay và lưu; từ đó chứng chỉ khác thì **không gửi mật khẩu**, báo `loi_van_tay`. Ghim lần đầu nên làm trong mạng nội bộ tin cậy. Đổi chứng chỉ trên router thì vào Tuỳ chọn › API bấm Gửi để ghim lại.
 - **Quyền tối thiểu**: tài khoản API chỉ `api,read`, chỉ đăng nhập được từ IP của Home Assistant; SNMP chỉ cho IP của Home Assistant. Hai điều đó phải khớp luật tường lửa mục «Chuẩn bị MikroTik».
-- **Chống khoá tài khoản**: sau một lần đăng nhập thất bại (ZTE hoặc API) tích hợp nghỉ 30 phút; mỗi lần đọc đăng nhập tối đa một lần; chỉ một phiên.
+- **Chống khoá tài khoản**: sau một lần bị từ chối đăng nhập (ZTE hoặc API) tích hợp nghỉ 30 phút; lỗi mạng thường không kích hoạt tạm ngừng; mỗi lần đọc đăng nhập tối đa một lần; giữ một phiên suốt vòng đời coordinator.
 - **Mật khẩu không vào log hay thông báo lỗi.** Chúng được lưu trong cấu hình Home Assistant như mọi tích hợp: bảo vệ máy chủ Home Assistant và bản sao lưu của nó.
 - Dữ liệu từ router và ZTE (tên máy…) bị cắt độ dài và loại ký tự điều khiển trước khi dùng.
 
@@ -166,7 +168,7 @@ Thiết bị mới vào mạng thì tự có thực thể và tự nối vào s�
 | Không có cổng nào | Quyền SNMP sai, hoặc thư viện `pysnmp` thiếu | Xem Nhật ký Home Assistant (lọc `mikrotik_snmp`) |
 | Mật khẩu bị từ chối dù đúng | Mật khẩu có dấu nháy cong `“ ”` hoặc ký tự lạ | Đặt lại mật khẩu chỉ chữ và số |
 | ZTE báo «từ chối đăng nhập» | Sai tên/mật khẩu **hoặc đang có phiên quản trị khác** (trình duyệt đang mở trang ZTE, tích hợp `zte_e2633` riêng, app) | Đóng mọi nơi đang đăng nhập ZTE, tắt `zte_e2633` riêng, chờ vài phút rồi Gửi lại |
-| `zte_trang_thai` = `tam_ngung` | Vừa có một lần đăng nhập ZTE thất bại | Chờ 30 phút, hoặc ⚙ Tuỳ chọn › ZTE bấm Gửi để thử lại |
+| `zte_trang_thai` = `tam_ngung` | Bộ phát vừa TỪ CHỐI đăng nhập (sai mật khẩu hoặc tài khoản bị khoá); lỗi mạng không gây ra trạng thái này | Chờ 30 phút, hoặc ⚙ Tuỳ chọn › ZTE bấm Gửi để thử lại |
 | Máy WiFi nằm dưới cổng, không dưới ZTE | ZTE chưa điền hoặc chưa đăng nhập được (`zte_trang_thai` ≠ `ok`); hoặc máy đó cắm dây qua ZTE (ZTE chỉ liệt kê máy WiFi) | Xử lý ZTE như dòng trên; máy cắm dây qua ZTE nằm dưới cổng là đúng |
 | `api_trang_thai` = `loi_van_tay` | Chứng chỉ router đã đổi | ⚙ Tuỳ chọn › API bấm Gửi để ghim vân tay mới |
 | `api_trang_thai` = `loi_ket_noi` | Chưa mở 8729 cho IP Home Assistant | `/ip service print` (api-ssl bật, `address` đúng), luật tường lửa TCP 8729 |
@@ -179,10 +181,38 @@ Thiết bị mới vào mạng thì tự có thực thể và tự nối vào s�
 
 Muốn xem log chi tiết, thêm vào `configuration.yaml`: `logger: { logs: { custom_components.mikrotik_snmp: debug } }`. Log không chứa mật khẩu.
 
+## Bộ phát chỉ cho một phiên: không chạy hai tích hợp ZTE cùng lúc
+Bộ phát ZTE E2633 có thể chỉ cho **MỘT** phiên quản trị hoạt động tại một thời điểm:
+- Không chạy cùng lúc tích hợp này với tích hợp ZTE khác (ví dụ tích hợp riêng `zte_e2633`) hoặc ứng dụng điện thoại / trang quản trị trong trình duyệt trên cùng tài khoản.
+- Chu kỳ đọc ZTE hiện tại là `CHU_KY_ZTE_GIAY` = 15 giây. Nếu thấy bộ phát khoá hoặc trả «页面过期» (nguyên văn của thiết bị: "trang đã hết hạn"), hãy đóng các phiên quản trị khác; nếu vẫn bị, tăng hằng số `CHU_KY_ZTE_GIAY` trong `custom_components/mikrotik_snmp/const.py` (hiện chưa có ô cấu hình để đổi, phải sửa mã). Không đổi giá trị mặc định nếu không có bằng chứng.
+
+## Cách thu log gỡ lỗi đã che
+Khi cần gửi nhật ký để nhờ hỗ trợ hoặc mở issue, hãy làm theo các bước sau để đảm bảo không lộ thông tin mạng nhà:
+1. Thêm cấu hình logger vào `configuration.yaml`:
+   ```yaml
+   logger:
+     default: info
+     logs:
+       custom_components.mikrotik_snmp: debug
+   ```
+2. Lọc nhật ký và chạy công cụ che tự động kèm theo kho:
+   ```bash
+   grep mikrotik_snmp config/home-assistant.log | python3 scripts/che_log.py > log_da_che.txt
+   ```
+3. **Nhắc nhở quan trọng**: Tự mở và đọc lại tệp `log_da_che.txt` trước khi đăng. TUYỆT ĐỐI không đăng nhật ký gốc chưa che, không chụp ảnh màn hình trang quản trị bộ phát hay gửi cookie phiên.
+
 ## Trạng thái kiểm chứng (nói thật)
-- **Kiểm bằng router và ZTE giả** (`python3 -m unittest discover -s tests -p "test_*.py"`, 94 test): tốc độ từ bộ đếm 64-bit và tràn bộ đếm, router khởi động lại, phân tích bảng giao diện/ARP/bảng MAC, gộp cây, chốt nghỉ ZTE/API, máy khách API chỉ cho lệnh `print`, ghim vân tay, cổng thuộc bridge.
+- **Kiểm bằng router và ZTE giả + lõi Home Assistant thật** (`python3 -m unittest discover -s tests -p "test_*.py"`, 141 test): tốc độ từ bộ đếm 64-bit và tràn bộ đếm, router khởi động lại, phân tích bảng giao diện/ARP/bảng MAC, gộp cây, phân loại lỗi kết nối / từ chối đăng nhập ZTE, kiểm soát kích thước thuộc tính recorder (ngăn tràn 16 KB), máy khách API chỉ cho lệnh `print`, ghim vân tay, cổng thuộc bridge.
 - **Đã chạy trên một nhà thật** (RouterOS 7, ZTE E2633, Home Assistant): đọc cổng và tốc độ, cây thiết bị, tên máy từ DHCP, máy WiFi dưới ZTE, WireGuard.
+- **Chưa kiểm với bộ phát thật và Home Assistant đang chạy thật** cho các thay đổi mới ở phiên bản 0.7.1.
 - **Chưa kiểm trên nhiều cấu hình**: định dạng thật của `/interface/bridge/port/print` trên nhiều bản RouterOS; nhiệt độ/điện áp (`MIKROTIK-MIB`) và RAM (`hrStorage`) có thể khác theo bo mạch (thiếu thì cảm biến bị bỏ); các bản firmware ZTE khác E2633.
+
+## Thay đổi ở 0.7.1
+- **Điểm 2 — Đọc WiFi hỏng không thành «không có máy»**: Xử lý dữ liệu ZTE sai khuôn (`DuLieuSaiKhuon`): phân tích lỗi đọc do bộ phát trả kiểu lạ hoặc đổi tên trường thành `ZteLoiKetNoi`, giữ danh sách máy WiFi cũ và đánh dấu thực thể WiFi `available = False` (không coi là "không có máy", tránh làm mọi thiết bị theo dõi WiFi chuyển "vắng" hàng loạt). Thiết bị có dây MikroTik vẫn sống và `available = True`.
+- **Điểm 3 — Phiên và backoff**: Phân loại lỗi bằng cấu trúc: `ZteLoiDangNhap` chỉ xảy ra khi bộ phát từ chối tài khoản (chỉ loại lỗi này mới tạm ngừng 30 phút); mất mạng, trang khởi động lại không có token, token rỗng, lỗi HTTP ở trang lấy token thành `ZteLoiKetNoi` và hồi phục ngay ở chu kỳ sau khi bộ phát sống lại; bắt `HTTPError` trước `URLError`, đóng socket tránh rò rỉ (`ResourceWarning`); thêm `dang_xuat()` khi gỡ tích hợp để quên phiên phía máy khách; bổ sung debug log không chứa thông tin nhạy cảm.
+- **Điểm 4 — Ngăn tràn bộ nhớ recorder (16 KB)**: Khai báo `_unrecorded_attributes` cho `BangMacSensor` (`MATCH_ALL`) và `ThietBiLanSensor` (`clients`) bên cạnh `ZteSoMaySensor` và `CayThietBiSensor` để tránh vượt ngưỡng 16384 byte của recorder khi mạng LAN có nhiều thiết bị.
+- **Điểm 5 — Bộ test mức coordinator trên lõi Home Assistant thật**: Thêm `tests/test_dieu_phoi_ha.py` (9 ca test trên lõi Home Assistant thật với mock router và máy chủ ZTE giả) và `tests/test_zte_loi.py` (26 test kiểm tra phân loại lỗi và phục hồi ZTE).
+- **Công cụ che log**: Cập nhật `scripts/che_log.py` và `tests/test_che_log.py` cho `mikrotik_snmp`.
 
 ## Phát triển
 ```

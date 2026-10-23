@@ -12,7 +12,7 @@ Tích hợp này **không có đường ghi nào trong mã**: SNMP chỉ đọc,
 5. [Thêm tích hợp](#thêm-tích-hợp-vào-home-assistant) · 6. [Tuỳ chọn](#tuỳ-chọn-nút-bánh-răng) · 7. [Cây thiết bị](#cây-thiết-bị) ·
 8. [Thực thể](#thực-thể) · 9. [Dùng với card](#dùng-với-card) · 10. [Bảo mật](#bảo-mật) · 11. [Khắc phục sự cố](#khắc-phục-sự-cố) ·
 12. [Bộ phát chỉ cho một phiên](#bộ-phát-chỉ-cho-một-phiên-không-chạy-hai-tích-hợp-zte-cùng-lúc) · 13. [Thu log gỡ lỗi đã che](#cách-thu-log-gỡ-lỗi-đã-che) ·
-14. [Trạng thái kiểm chứng](#trạng-thái-kiểm-chứng-nói-thật) · 15. [Thay đổi ở 0.7.1](#thay-đổi-ở-071)
+14. [Trạng thái kiểm chứng](#trạng-thái-kiểm-chứng-nói-thật) · 15. [Thay đổi ở 0.7.2](#thay-đổi-ở-072) · [0.7.1](#thay-đổi-ở-071)
 
 ## Nó làm gì
 Ba nguồn dữ liệu, **chỉ SNMP là bắt buộc**; hai nguồn còn lại tuỳ chọn và hỏng thì phần còn lại vẫn chạy:
@@ -206,6 +206,9 @@ Khi cần gửi nhật ký để nhờ hỗ trợ hoặc mở issue, hãy làm t
 - **Đã chạy trên một nhà thật** (RouterOS 7, ZTE E2633, Home Assistant): đọc cổng và tốc độ, cây thiết bị, tên máy từ DHCP, máy WiFi dưới ZTE, WireGuard.
 - **Chưa kiểm với bộ phát thật và Home Assistant đang chạy thật** cho các thay đổi mới ở phiên bản 0.7.1.
 - **Chưa kiểm trên nhiều cấu hình**: định dạng thật của `/interface/bridge/port/print` trên nhiều bản RouterOS; nhiệt độ/điện áp (`MIKROTIK-MIB`) và RAM (`hrStorage`) có thể khác theo bo mạch (thiếu thì cảm biến bị bỏ); các bản firmware ZTE khác E2633.
+
+## Thay đổi ở 0.7.2
+- **Icon riêng** cho tích hợp trong Home Assistant (`custom_components/mikrotik_snmp/brand/`): router có hai antenna và sóng WiFi, kèm bản cho nền tối. Home Assistant có hỗ trợ thư mục `brand/` tự nạp (đã thấy trong 2026.10.3; bản cũ hơn chưa kiểm). Không đổi mã.
 
 ## Thay đổi ở 0.7.1
 - **Điểm 2 — Đọc WiFi hỏng không thành «không có máy»**: Xử lý dữ liệu ZTE sai khuôn (`DuLieuSaiKhuon`): phân tích lỗi đọc do bộ phát trả kiểu lạ hoặc đổi tên trường thành `ZteLoiKetNoi`, giữ danh sách máy WiFi cũ và đánh dấu thực thể WiFi `available = False` (không coi là "không có máy", tránh làm mọi thiết bị theo dõi WiFi chuyển "vắng" hàng loạt). Thiết bị có dây MikroTik vẫn sống và `available = True`.

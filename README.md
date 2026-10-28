@@ -1,5 +1,7 @@
 # Mạng LAN: MikroTik (SNMP, chỉ đọc) + ZTE E2633 — tích hợp Home Assistant
 
+[![Mở kho này trong HACS của bạn.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=TriTue2011&repository=mikrotik_snmp&category=integration)
+
 Một tích hợp cho cả mạng nhà: đọc router **MikroTik** bằng **SNMPv3 chỉ đọc**, và (tuỳ chọn) đọc thêm bộ phát **ZTE E2633** để biết máy nào đang dùng WiFi.
 Kết quả là một **cây thiết bị** `Router → Bridge → Cổng → ZTE → Máy` cùng tốc độ thời gian thực, đủ để card
 [`mikrotik-topo-lan-card`](https://github.com/TriTue2011/mikrotik-topo-lan-card) tự vẽ sơ đồ mạng.

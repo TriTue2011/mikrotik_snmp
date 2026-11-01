@@ -11,8 +11,8 @@ from homeassistant.helpers import selector
 
 from . import logic as L
 from .const import (
-    AUTH_MAC_DINH, AUTH_PROTOCOLS, CHU_KY_LON_NHAT, CHU_KY_MAC_DINH, CHU_KY_NHO_NHAT, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL,
-    CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_TEN_MAY, CONF_PORT, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN,
+    AUTH_MAC_DINH, AUTH_PROTOCOLS, CHU_KY_LON_NHAT, CHU_KY_MAC_DINH, CHU_KY_NHO_NHAT, DON_SAU_NGAY_MAC_DINH, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL,
+    CONF_CHU_KY, CONF_CONG, CONF_DON_SAU_NGAY, CONF_HOST, CONF_TEN_MAY, CONF_PORT, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TIEN_TO, DOMAIN,
     CONF_API_MAT_KHAU, CONF_API_PORT, CONF_API_TEN, CONF_API_VAN_TAY, API_PORT_MAC_DINH,
     CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, PORT_MAC_DINH, PRIV_MAC_DINH, PRIV_PROTOCOLS, TIEN_TO_MAC_DINH,
 )
@@ -227,6 +227,8 @@ class MikrotikSnmpOptionsFlow(OptionsFlow):
                 selector.SelectSelectorConfig(options=ten_cong, multiple=True, mode=selector.SelectSelectorMode.DROPDOWN)),
             vol.Optional(CONF_TEN_MAY, default=hien_tai.get(CONF_TEN_MAY, "")): selector.TextSelector(
                 selector.TextSelectorConfig(multiline=True)),
+            vol.Required(CONF_DON_SAU_NGAY, default=hien_tai.get(CONF_DON_SAU_NGAY, DON_SAU_NGAY_MAC_DINH)): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=365)),
         }))
 
     async def async_step_zte(self, user_input: dict[str, Any] | None = None):

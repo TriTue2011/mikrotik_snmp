@@ -81,24 +81,31 @@ class ZteE2633:
         self._ten = ten
         self._mat_khau = mat_khau
         self._cho = thoi_gian_cho
-        ngu = ssl.create_default_context()
-        if not xac_minh_ssl:
-            # Bộ phát dùng chứng chỉ tự ký trong mạng nhà; bật xác minh nếu có chứng chỉ hợp lệ.
-            ngu.check_hostname = False
-            ngu.verify_mode = ssl.CERT_NONE
+        self._xac_minh_ssl = xac_minh_ssl
         self._jar = http.cookiejar.CookieJar()
-        self._mo = urllib.request.build_opener(
-            urllib.request.ProxyHandler({}),
-            urllib.request.HTTPSHandler(context=ngu),
-            urllib.request.HTTPCookieProcessor(self._jar),
-        )
+        self._mo_cache: urllib.request.OpenerDirector | None = None
         self._co_phien = False
+
+    def _mo(self) -> urllib.request.OpenerDirector:
+        """Dựng bộ mở HTTP ở lần dùng đầu (luôn nằm trong luồng nền): nạp chứng chỉ gốc là việc chặn, không làm trong vòng lặp sự kiện."""
+        if self._mo_cache is None:
+            ngu = ssl.create_default_context()
+            if not self._xac_minh_ssl:
+                # Bộ phát dùng chứng chỉ tự ký trong mạng nhà; bật xác minh nếu có chứng chỉ hợp lệ.
+                ngu.check_hostname = False
+                ngu.verify_mode = ssl.CERT_NONE
+            self._mo_cache = urllib.request.build_opener(
+                urllib.request.ProxyHandler({}),
+                urllib.request.HTTPSHandler(context=ngu),
+                urllib.request.HTTPCookieProcessor(self._jar),
+            )
+        return self._mo_cache
 
     def _doc(self, duong: str, du_lieu: bytes | None = None, them: dict[str, str] | None = None) -> str:
         tieu_de = {"Referer": self._goc + "/", **(them or {})}
         yc = urllib.request.Request(self._goc + duong, data=du_lieu, headers=tieu_de)
         try:
-            with self._mo.open(yc, timeout=self._cho) as r:
+            with self._mo().open(yc, timeout=self._cho) as r:
                 return r.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as loi:  # phải đứng trước URLError (HTTPError là lớp con)
             loi.close()  # HTTPError giữ socket của phản hồi; không đóng thì rò (ResourceWarning)

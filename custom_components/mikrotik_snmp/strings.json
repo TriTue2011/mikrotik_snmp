@@ -75,7 +75,8 @@
         "data": {
           "chu_ky": "Chu kỳ đọc (giây)",
           "cong": "Cổng hiển thị",
-          "ten_may": "Tên thiết bị (mỗi dòng: MAC = Tên)"
+          "ten_may": "Tên thiết bị (mỗi dòng: MAC = Tên)",
+          "don_sau_ngay": "Tự gỡ thiết bị đã vắng khỏi router sau (ngày, 0 = không tự gỡ)"
         },
         "description": "Đặt tên cho máy theo MAC, ví dụ: AA:BB:CC:DD:EE:01 = Máy in. Dòng bắt đầu bằng # là ghi chú. Tên này ưu tiên hơn tên từ ZTE."
       },
@@ -107,6 +108,18 @@
       "dang_nhap_api": "Router từ chối tài khoản API: kiểm tên và mật khẩu (tài khoản nên chỉ có quyền api,read).",
       "ket_noi_api": "Không tới được cổng API-SSL (8729). Kiểm /ip service api-ssl address và luật tường lửa cho IP Home Assistant.",
       "van_tay_api": "Chứng chỉ của router khác vân tay đã ghim. Nếu bạn vừa đổi chứng chỉ thì gửi lại để ghim vân tay mới."
+    }
+  },
+  "services": {
+    "don_thiet_bi_vang": {
+      "name": "Dọn thiết bị đã vắng",
+      "description": "Gỡ khỏi sổ thiết bị HA những máy/cổng/peer router không còn thấy (kèm thực thể của chúng).",
+      "fields": {
+        "ngay": {
+          "name": "Vắng ít nhất (ngày)",
+          "description": "0 = gỡ ngay mọi thiết bị đang vắng."
+        }
+      }
     }
   }
 }

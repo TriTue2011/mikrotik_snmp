@@ -75,7 +75,8 @@
         "data": {
           "chu_ky": "Poll interval (seconds)",
           "cong": "Ports to show",
-          "ten_may": "Device names (one per line: MAC = Name)"
+          "ten_may": "Device names (one per line: MAC = Name)",
+          "don_sau_ngay": "Remove devices the router no longer reports after (days, 0 = never)"
         },
         "description": "Name devices by MAC, e.g. AA:BB:CC:DD:EE:01 = Printer. Lines starting with # are comments. These names win over names from the ZTE."
       },
@@ -107,6 +108,18 @@
       "dang_nhap_api": "The router rejected the API account: check the name and password (the account should only have api,read).",
       "ket_noi_api": "Cannot reach the API-SSL port (8729). Check /ip service api-ssl address and the firewall rule for the Home Assistant IP.",
       "van_tay_api": "The router certificate differs from the pinned fingerprint. If you just changed it, submit again to pin the new one."
+    }
+  },
+  "services": {
+    "don_thiet_bi_vang": {
+      "name": "Remove missing devices",
+      "description": "Remove devices (and their entities) from the HA registry that the router no longer reports.",
+      "fields": {
+        "ngay": {
+          "name": "Missing for at least (days)",
+          "description": "0 = remove every device missing right now."
+        }
+      }
     }
   }
 }

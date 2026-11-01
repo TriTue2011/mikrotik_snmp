@@ -97,11 +97,17 @@ Mỗi bước kiểm kết nối ngay và báo lỗi rõ trên màn hình (sai m
 
 ## Tuỳ chọn (nút bánh răng)
 Cài đặt → Thiết bị & dịch vụ → mục MikroTik → ⚙ **Tuỳ chọn**. Ba màn hình liên tiếp, bấm **Gửi** ở mỗi màn hình (Gửi xong tích hợp tự tải lại):
-1. **Chung**: chu kỳ đọc; cổng hiển thị; **Tên thiết bị** — mỗi dòng `MAC = Tên`, ví dụ `AA:BB:CC:DD:EE:01 = Máy in` (dòng bắt đầu bằng `#` là ghi chú). Tên tự đặt ưu tiên hơn mọi nguồn khác.
+1. **Chung**: chu kỳ đọc; cổng hiển thị; **Tự gỡ thiết bị đã vắng sau N ngày** (mặc định 14, `0` = không tự gỡ — xem «Dọn thiết bị không còn trên router»); **Tên thiết bị** — mỗi dòng `MAC = Tên`, ví dụ `AA:BB:CC:DD:EE:01 = Máy in` (dòng bắt đầu bằng `#` là ghi chú). Tên tự đặt ưu tiên hơn mọi nguồn khác.
 2. **ZTE**: thêm, đổi hoặc tắt ZTE sau khi đã cài. Để trống mật khẩu = giữ mật khẩu cũ; để trống IP = tắt ZTE.
 3. **API**: thêm, đổi hoặc tắt API chỉ đọc (tên `ha-doc`, mật khẩu, cổng 8729). Để trống mật khẩu = giữ cũ.
 
 **Thứ tự ưu tiên tên máy:** tên tự đặt trong Tuỳ chọn › ghi chú (Comment) của lease DHCP › tên do ZTE báo › tên máy tự báo (`host-name`) › IP › MAC.
+
+## Dọn thiết bị không còn trên router
+Máy LAN, cổng, peer WireGuard hết trên router (xoá khỏi DHCP/ARP, peer bị xoá, cổng bỏ chọn) trước 0.8.0 nằm lại vĩnh viễn trong sổ thiết bị của Home Assistant. Từ 0.8.0:
+- **Tự gỡ**: thiết bị vắng khỏi dữ liệu router liên tục quá N ngày (Tuỳ chọn, mặc định 14) thì bị gỡ cùng thực thể của nó. Máy chỉ tắt nguồn vài hôm giữ nguyên là «không ở nhà». Mốc «vắng từ lúc nào» lưu bền nên sống qua khởi động lại. Chỉ xét khi lần đọc router gần nhất thành công.
+- **Gỡ ngay các thiết bị cũ đã tồn đọng**: Công cụ nhà phát triển → Hành động → `mikrotik_snmp.don_thiet_bi_vang` (`ngay: 0` = gỡ mọi thiết bị đang vắng; đặt số ngày để chỉ gỡ cái vắng từ lâu). Từ chối nếu lần đọc gần nhất chưa thành công hoặc ZTE chưa đọc xong danh sách máy WiFi (tránh gỡ nhầm máy đang có mặt).
+- **Xoá tay trong giao diện**: nút «Xoá thiết bị» trên trang thiết bị chỉ hoạt động với thiết bị router không còn thấy; thiết bị đang có mặt thì bị từ chối.
 
 ## Cây thiết bị
 Mỗi thiết bị có thiết bị cha (`via_device`), nên **mở trang một thiết bị trong Home Assistant là thấy mục «Thiết bị được kết nối»** liệt kê các thiết bị bên trong:
@@ -204,10 +210,15 @@ Khi cần gửi nhật ký để nhờ hỗ trợ hoặc mở issue, hãy làm t
 3. **Nhắc nhở quan trọng**: Tự mở và đọc lại tệp `log_da_che.txt` trước khi đăng. TUYỆT ĐỐI không đăng nhật ký gốc chưa che, không chụp ảnh màn hình trang quản trị bộ phát hay gửi cookie phiên.
 
 ## Trạng thái kiểm chứng (nói thật)
-- **Kiểm bằng router và ZTE giả + lõi Home Assistant thật** (`python3 -m unittest discover -s tests -p "test_*.py"`, 141 test): tốc độ từ bộ đếm 64-bit và tràn bộ đếm, router khởi động lại, phân tích bảng giao diện/ARP/bảng MAC, gộp cây, phân loại lỗi kết nối / từ chối đăng nhập ZTE, kiểm soát kích thước thuộc tính recorder (ngăn tràn 16 KB), máy khách API chỉ cho lệnh `print`, ghim vân tay, cổng thuộc bridge.
+- **Kiểm bằng router và ZTE giả + lõi Home Assistant thật** (`python3 -m unittest discover -s tests -p "test_*.py"`, 161 test): tốc độ từ bộ đếm 64-bit và tràn bộ đếm, router khởi động lại, phân tích bảng giao diện/ARP/bảng MAC, gộp cây, phân loại lỗi kết nối / từ chối đăng nhập ZTE, kiểm soát kích thước thuộc tính recorder (ngăn tràn 16 KB), máy khách API chỉ cho lệnh `print`, ghim vân tay, cổng thuộc bridge.
 - **Đã chạy trên một nhà thật** (RouterOS 7, ZTE E2633, Home Assistant): đọc cổng và tốc độ, cây thiết bị, tên máy từ DHCP, máy WiFi dưới ZTE, WireGuard.
 - **Chưa kiểm với bộ phát thật và Home Assistant đang chạy thật** cho các thay đổi mới ở phiên bản 0.7.1.
 - **Chưa kiểm trên nhiều cấu hình**: định dạng thật của `/interface/bridge/port/print` trên nhiều bản RouterOS; nhiệt độ/điện áp (`MIKROTIK-MIB`) và RAM (`hrStorage`) có thể khác theo bo mạch (thiếu thì cảm biến bị bỏ); các bản firmware ZTE khác E2633.
+
+## Thay đổi ở 0.8.0
+- **Sửa lỗi nền tảng `binary_sensor` không nạp được** (`name 'slug' is not defined`): thiếu hai import trong `binary_sensor.py` khiến mọi trạng thái kết nối của peer WireGuard không hiện. Có test hồi quy.
+- **Dọn thiết bị không còn trên router** (tự gỡ sau N ngày, dịch vụ `don_thiet_bi_vang`, nút xoá trong giao diện): xem mục trên.
+- **Hết cảnh báo «blocking call» của ZTE**: bộ mở HTTPS (nạp chứng chỉ gốc) dựng ở luồng nền thay vì trong vòng lặp sự kiện. Cảnh báo tương tự của thư viện SNMP (nạp tệp MIB lần đầu) vẫn còn, chỉ là cảnh báo.
 
 ## Thay đổi ở 0.7.2
 - **Icon riêng** cho tích hợp trong Home Assistant (`custom_components/mikrotik_snmp/brand/`): router có hai antenna và sóng WiFi, kèm bản cho nền tối. Home Assistant có hỗ trợ thư mục `brand/` tự nạp (đã thấy trong 2026.10.3; bản cũ hơn chưa kiểm). Không đổi mã.

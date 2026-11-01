@@ -6,17 +6,19 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed
+import voluptuous as vol
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     AUTH_MAC_DINH, CHU_KY_MAC_DINH, CONF_AUTH_KEY, CONF_AUTH_PROTOCOL, CONF_CHU_KY, CONF_CONG, CONF_HOST, CONF_PORT,
     CONF_API_MAT_KHAU, CONF_API_PORT, CONF_API_TEN, CONF_API_VAN_TAY, API_PORT_MAC_DINH,
-    CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TEN_MAY, CONF_TIEN_TO, CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, DOMAIN,
+    CONF_DON_SAU_NGAY, DON_SAU_NGAY_MAC_DINH, CONF_PRIV_KEY, CONF_PRIV_PROTOCOL, CONF_TEN, CONF_TEN_MAY, CONF_TIEN_TO, CONF_ZTE_HOST, CONF_ZTE_MAT_KHAU, CONF_ZTE_SSL, CONF_ZTE_TEN, DOMAIN,
     PORT_MAC_DINH, PRIV_MAC_DINH, TIEN_TO_MAC_DINH,
 )
+from .don_dep import DonDep, khoa_cua_thiet_bi
 from .snmp_client import SnmpClient, SnmpLoi, SnmpLoiDangNhap
 from .thiet_bi import cha_cua_giao_dien, dinh_danh_cha
 from .logic import phan_tich_ten_may
@@ -57,6 +59,7 @@ class MikrotikSnmpCoordinator(DataUpdateCoordinator):
             api = NguonApi(cfg[CONF_HOST], cfg.get(CONF_API_PORT, API_PORT_MAC_DINH), cfg[CONF_API_TEN], cfg.get(CONF_API_MAT_KHAU, ""),
                            cfg.get(CONF_API_VAN_TAY, ""), hass.async_add_executor_job)
         self._api = api
+        self.don_dep: DonDep | None = None      # gắn sau khi nạp xong (async_setup_entry)
         self.thu_thap = ThuThap(self.client, cfg.get(CONF_CONG) or None, zte=zte, ten_may=phan_tich_ten_may(cfg.get(CONF_TEN_MAY, "")), api=api)
 
     async def _async_update_data(self):
@@ -97,8 +100,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                sw_version=ap.get("firmware") or None,
                                via_device=dinh_danh_cha(entry.entry_id, nut_zte.get("parent"), du_lieu))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    don = DonDep(hass, entry, coordinator, int(cau_hinh_hieu_luc(entry).get(CONF_DON_SAU_NGAY, DON_SAU_NGAY_MAC_DINH)))
+    await don.tai()
+    coordinator.don_dep = don
+    entry.async_on_unload(coordinator.async_add_listener(don.cap_nhat))
+    _dang_ky_dich_vu(hass)
     entry.async_on_unload(entry.add_update_listener(_khi_tuy_chon_doi))
     return True
+
+
+def _dang_ky_dich_vu(hass: HomeAssistant) -> None:
+    if hass.services.has_service(DOMAIN, "don_thiet_bi_vang"):
+        return
+
+    async def _don(call: ServiceCall) -> None:
+        n = sum(c.don_dep.don_ngay(call.data["ngay"]) for c in hass.data.get(DOMAIN, {}).values() if c.don_dep is not None)
+        LOGGER.info("đã gỡ %d thiết bị không còn trên router", n)
+
+    hass.services.async_register(DOMAIN, "don_thiet_bi_vang", _don,
+                                 schema=vol.Schema({vol.Optional("ngay", default=0): vol.All(vol.Coerce(float), vol.Range(min=0, max=365))}))
+
+
+async def async_remove_config_entry_device(hass: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry) -> bool:
+    """Nút «Xoá thiết bị» trong giao diện: cho xoá khi router không còn thấy thiết bị đó; thiết bị đang có mặt thì từ chối."""
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is None or coordinator.don_dep is None:
+        return True
+    return coordinator.don_dep.co_the_go(khoa_cua_thiet_bi(device_entry.identifiers, device_entry.connections))
 
 
 async def _khi_tuy_chon_doi(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -109,6 +137,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if ok:
         coordinator = hass.data[DOMAIN].pop(entry.entry_id, None)
+        if not hass.data[DOMAIN]:
+            hass.services.async_remove(DOMAIN, "don_thiet_bi_vang")
         if coordinator is not None:
             coordinator.client.dong()
             if coordinator._api is not None:

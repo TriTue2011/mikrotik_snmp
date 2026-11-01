@@ -245,7 +245,7 @@ class HoiPhucTest(unittest.TestCase):
 
         def _mo(*_a, **_k):
             raise loi
-        c._mo.open = _mo
+        c._mo().open = _mo      # bộ mở HTTP dựng lười, lần gọi này dựng và giữ lại cho c.doc_thiet_bi()
         with self.assertRaises(ZteLoiKetNoi):
             c.doc_thiet_bi()
         self.assertTrue(fp.closed)

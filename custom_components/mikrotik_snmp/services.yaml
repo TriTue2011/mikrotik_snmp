@@ -1,0 +1,11 @@
+don_thiet_bi_vang:
+  fields:
+    ngay:
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 365
+          mode: box
+          unit_of_measurement: ngày

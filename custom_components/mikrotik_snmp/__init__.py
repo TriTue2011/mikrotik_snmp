@@ -21,6 +21,7 @@ from .const import (
 from .don_dep import DonDep, khoa_cua_thiet_bi
 from .snmp_client import SnmpClient, SnmpLoi, SnmpLoiDangNhap
 from .thiet_bi import cha_cua_giao_dien, dinh_danh_cha
+from .thiet_bi_con import tao_thiet_bi_con
 from .logic import phan_tich_ten_may
 from .thu_thap import LoiDuLieu, ThuThap
 from .zte_api import ZteE2633
@@ -90,15 +91,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     goc = (DOMAIN, entry.entry_id)
     cha_cua = {chi_so: cha_cua_giao_dien(entry.entry_id, gd["name"], du_lieu) for chi_so, gd in (du_lieu.get("interfaces") or {}).items()}
     for chi_so in sorted(cha_cua, key=lambda c: cha_cua[c] != goc):
-        so_thiet_bi.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"{entry.entry_id}_{chi_so}")},
-                               name=du_lieu["interfaces"][chi_so]["name"], manufacturer="MikroTik", via_device=cha_cua[chi_so])
+        tao_thiet_bi_con(so_thiet_bi, entry.entry_id, {(DOMAIN, f"{entry.entry_id}_{chi_so}")}, cha_cua[chi_so],
+                         name=du_lieu["interfaces"][chi_so]["name"], manufacturer="MikroTik")
     if coordinator.co_zte:
         nut_zte = next((n for n in (du_lieu.get("tree") or {}).get("nodes", []) if n["id"] == "zte"), {})
         ap = (du_lieu.get("zte") or {}).get("ap") or {}
-        so_thiet_bi.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"{entry.entry_id}_zte")},
-                               name=nut_zte.get("name") or "ZTE E2633", manufacturer="ZTE", model="E2633",
-                               sw_version=ap.get("firmware") or None,
-                               via_device=dinh_danh_cha(entry.entry_id, nut_zte.get("parent"), du_lieu))
+        tao_thiet_bi_con(so_thiet_bi, entry.entry_id, {(DOMAIN, f"{entry.entry_id}_zte")},
+                         dinh_danh_cha(entry.entry_id, nut_zte.get("parent"), du_lieu),
+                         name=nut_zte.get("name") or "ZTE E2633", manufacturer="ZTE", model="E2633", sw_version=ap.get("firmware") or None)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     don = DonDep(hass, entry, coordinator, int(cau_hinh_hieu_luc(entry).get(CONF_DON_SAU_NGAY, DON_SAU_NGAY_MAC_DINH)))
     await don.tai()

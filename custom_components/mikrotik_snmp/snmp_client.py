@@ -66,6 +66,14 @@ def _gia_tri(v: Any, hex_octet: bool = False) -> Any:
         return v.prettyPrint() if hasattr(v, "prettyPrint") else str(v)
 
 
+def _tao_engine(h: Any) -> Any:
+    """Tạo engine VÀ nạp sẵn mọi MIB có sẵn của pysnmp, chạy ở luồng phụ: pysnmp nạp MIB lười ở gói trả lời đầu tiên (liệt kê thư mục
+    `pysnmp/smi/mibs`) ngay trong vòng lặp sự kiện, HA thật báo «blocking call to listdir inside the event loop»."""
+    engine = h.SnmpEngine()
+    engine.get_mib_builder().load_modules()
+    return engine
+
+
 class SnmpClient:
     def __init__(self, hass: Any, host: str, port: int, ten: str, auth_key: str, priv_key: str,
                  auth_protocol: str, priv_protocol: str):
@@ -80,7 +88,7 @@ class SnmpClient:
         from pysnmp.hlapi.v3arch import asyncio as h  # nhập muộn: chỉ cần khi thật sự hỏi
         if self._engine is None:
             try:
-                self._engine = await self._hass.async_add_executor_job(h.SnmpEngine)
+                self._engine = await self._hass.async_add_executor_job(_tao_engine, h)
             except Exception:  # noqa: BLE001 - tạo ngay trong vòng lặp nếu luồng phụ không dùng được
                 self._engine = h.SnmpEngine()
         if self._muc_tieu is None:

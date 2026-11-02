@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import pathlib
 import sys
+import threading
 import types
 import unittest
 
@@ -76,12 +77,21 @@ class GiaTri:
 
 class Hass:
     async def async_add_executor_job(self, f, *a):
-        return f(*a)
+        return await asyncio.get_running_loop().run_in_executor(None, f, *a)
 
 
 def cai_pysnmp_gia(db, lop_ten):
     mod = types.ModuleType("pysnmp.hlapi.v3arch.asyncio")
-    mod.SnmpEngine = lambda: types.SimpleNamespace(close_dispatcher=lambda: None)
+    def tao_engine():
+        nap = types.SimpleNamespace(luong=[], da_nap=False)
+
+        def load_modules(*ten):
+            nap.luong.append(threading.current_thread().name)
+            nap.da_nap = True
+        e = types.SimpleNamespace(close_dispatcher=lambda: None, get_mib_builder=lambda: types.SimpleNamespace(load_modules=load_modules), nap=nap)
+        mod.engine_cuoi = e
+        return e
+    mod.SnmpEngine = tao_engine
     mod.UsmUserData = lambda *a, **k: ("usm", a, k)
     mod.ContextData = lambda: None
 
@@ -128,6 +138,15 @@ DB = {
 
 
 class MayKhachTest(unittest.TestCase):
+    def test_nap_san_mib_trong_luong_phu_khong_doc_o_vong_lap(self):
+        """HA thật báo «Detected blocking call to listdir … pysnmp/smi/mibs inside the event loop»: pysnmp nạp MIB LƯỜI ở gói trả lời đầu tiên,
+        tức trong vòng lặp. Phải nạp sẵn lúc tạo engine, mà việc đó chạy ở luồng phụ."""
+        mk = self._mk(lambda o: o)
+        chay(mk._chuan_bi())
+        e = sys.modules["pysnmp.hlapi.v3arch.asyncio"].engine_cuoi
+        self.assertTrue(e.nap.da_nap, "engine chưa nạp sẵn MIB")
+        self.assertNotIn(threading.main_thread().name, e.nap.luong, "MIB nạp ngay trong luồng chính (vòng lặp)")
+
     def _mk(self, lop_ten):
         cai_pysnmp_gia(DB, lop_ten)
         from mikrotik_snmp.snmp_client import SnmpClient
